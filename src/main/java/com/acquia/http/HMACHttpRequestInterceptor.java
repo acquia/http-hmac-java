@@ -91,7 +91,7 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
             authHeader.append(this.accessKey);
             authHeader.append(":");
             authHeader.append(encryptedMessage);
-            request.addHeader("Authorization", encryptedMessage);
+            request.addHeader("Authorization", authHeader.toString());
         }
         catch ( SignatureException e ) {
             throw new IOException("Could not encrypt message", e);
