@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Scanner;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -119,9 +120,15 @@ public class HMACMessageCreator {
         returnMessage.append(httpVerb.toUpperCase());
         returnMessage.append("\n");
         if ( requestBody != null ) {
-            String result = DigestUtils.md5Hex( requestBody );
+        	String theString = new Scanner(requestBody,"UTF-8").useDelimiter("\\A").next();
+            //String result = DigestUtils.md5Hex( requestBody );
+        	String result = DigestUtils.md5Hex(theString);
             returnMessage.append(result);
             returnMessage.append("\n");
+        } else {
+            String result = DigestUtils.md5Hex( "" );
+            returnMessage.append(result);
+            returnMessage.append("\n");      	
         }
         returnMessage.append(contentType);
         returnMessage.append("\n");
@@ -136,7 +143,11 @@ public class HMACMessageCreator {
             returnMessage.append(customHeaders.get(customHeaderKey));
             returnMessage.append("\n");            
         }
+        returnMessage.append("\n");
         returnMessage.append( resource );
         return returnMessage.toString();        
     }
+    
+
+    
 }
