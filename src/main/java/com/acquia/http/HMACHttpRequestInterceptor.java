@@ -20,6 +20,8 @@ import org.apache.http.protocol.HttpContext;
  */
 public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
 
+    private static final String VERSION = "2.0";
+
     /**
      * The Authorization provider
      */
@@ -86,15 +88,15 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
      * Helper method to implode a list of Strings into a String
      * For example: List [ "a", "b" ] delimiter "," will become "a,b"
      * @param theList
-     * @param delimiter
+     * @param glue
      * @return
      */
-    private String implodeStringArray(List<String> theList, String delimiter) {
+    private String implodeStringArray(List<String> theList, String glue) {
         StringBuilder sBuilder = new StringBuilder();
         boolean isFirst = true;
         for (String aString : theList) {
             if (!isFirst) {
-                sBuilder.append(delimiter);
+                sBuilder.append(glue);
             }
             sBuilder.append(aString);
             isFirst = false;
@@ -109,8 +111,8 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         authHeader.append("acquia-http-hmac realm=\"").append(this.realm).append("\",");
         authHeader.append("id=\"").append(this.accessKey).append("\",");
         authHeader.append("nonce=\"").append(UUID.randomUUID().toString()).append("\",");
-        authHeader.append("version=\"").append("2.0").append("\",");
-        authHeader.append("headers=\"").append(this.implodeStringArray(this.customHeaders, ",")).append(
+        authHeader.append("version=\"").append(VERSION).append("\",");
+        authHeader.append("headers=\"").append(this.implodeStringArray(this.customHeaders, ";")).append(
             "\"");
         request.setHeader("Authorization", authHeader.toString()); //the info provided so far will need to be encrypted
 

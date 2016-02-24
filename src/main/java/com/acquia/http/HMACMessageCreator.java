@@ -73,7 +73,7 @@ public class HMACMessageCreator {
      * This method converts an Authorization string into a key-value pair Map
      * 
      * The input format:
-     * acquia-http-hmac realm="Example",id="identifier",nonce="d1954337-5319-4821-8427-115542e08d10",version="2.0",headers="custom1,custom2",signature="Signature"
+     * acquia-http-hmac realm="Example",id="client-id",nonce="random-uuid",version="2.0",headers="custom1;custom2",signature="Signature"
      * 
      * The result of this call will be a Map in <key,value> pair of the parameters section (2nd token)
      * This will discard the 1st token (i.e.: acquia-http-hmac will be discarded)
@@ -126,7 +126,7 @@ public class HMACMessageCreator {
     private Map<String, String> buildCustomHeaderMap(HttpServletRequest request,
             String customHeaders) {
         Map<String, String> theMap = new HashMap<String, String>();
-        for (String headerName : customHeaders.split(",")) {
+        for (String headerName : customHeaders.split(";")) {
             String headerValue = request.getHeader(headerName);
             if (headerValue == null) {
                 continue; //FIXME: throw error? custom parameter cannot be found
@@ -192,7 +192,7 @@ public class HMACMessageCreator {
      */
     private Map<String, String> buildCustomHeaderMap(HttpRequest request, String customHeaders) {
         Map<String, String> theMap = new HashMap<String, String>();
-        for (String headerName : customHeaders.split(",")) {
+        for (String headerName : customHeaders.split(";")) {
             Header customHeader = request.getFirstHeader(headerName);
             if (customHeader == null) {
                 continue; //FIXME: throw error? custom parameter cannot be found

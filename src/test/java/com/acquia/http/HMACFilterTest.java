@@ -35,7 +35,7 @@ public class HMACFilterTest {
         };
         FilterConfig filterConfig = mock(FilterConfig.class);
         when(filterConfig.getInitParameter("customHeaders")).thenReturn("Custom1");
-        when(filterConfig.getInitParameter("algorithm")).thenReturn("SHA1");
+        when(filterConfig.getInitParameter("algorithm")).thenReturn("SHA256");
         testFilter.init(filterConfig);
 
         final ByteArrayInputStream realInputStream = new ByteArrayInputStream(
@@ -81,7 +81,7 @@ public class HMACFilterTest {
         };
         FilterConfig filterConfig = mock(FilterConfig.class);
         when(filterConfig.getInitParameter("customHeaders")).thenReturn("Custom1");
-        when(filterConfig.getInitParameter("algorithm")).thenReturn("SHA1");
+        when(filterConfig.getInitParameter("algorithm")).thenReturn("SHA256");
         testFilter.init(filterConfig);
 
         final ByteArrayInputStream realInputStream = new ByteArrayInputStream(

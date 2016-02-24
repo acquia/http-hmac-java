@@ -26,18 +26,20 @@ public class HMACHttpRequestInterceptorTest {
     public void testAddAuthorizationHeader() throws IOException, HttpException {
         //base Authorization parameter
         String realm = "Acquia";
-        String accessKey = "1";
-        String nonce = "de305d54-75b4-431b-adb2-eb6b9e546014";
+        String accessKey = "ABCD-1234";
+        String nonce = "6b996560-6342-4f57-9ef0-fdd6c2b61b29";
         String version = "2.0";
 
         HMACHttpRequestInterceptor authorizationInterceptor = new HMACHttpRequestInterceptor(realm,
-            accessKey, "secret-key", "SHA1");
-        authorizationInterceptor.setCustomHeaders(new String[] { "Custom1" });
+            accessKey, "secret-key", "SHA256");
+        authorizationInterceptor.setCustomHeaders(new String[] { "Special-header-1",
+                "Special-header-2" });
         HttpEntityEnclosingRequest request = mock(HttpEntityEnclosingRequest.class);
 
         RequestLine requestLine = mock(RequestLine.class);
         when(requestLine.getMethod()).thenReturn("GET");
-        when(requestLine.getUri()).thenReturn("http://acquia.com/resource/1?key=value");
+        when(requestLine.getUri()).thenReturn(
+            "http://acquia.com/resource=1?first_word=Hello&second_word=World");
         when(request.getRequestLine()).thenReturn(requestLine);
 
         final ByteArrayInputStream realInputStream = new ByteArrayInputStream(
@@ -57,17 +59,19 @@ public class HMACHttpRequestInterceptorTest {
         authHeader.append("id=\"").append(accessKey).append("\",");
         authHeader.append("nonce=\"").append(nonce).append("\",");
         authHeader.append("version=\"").append(version).append("\",");
-        authHeader.append("headers=\"").append("Custom1").append("\"");
+        authHeader.append("headers=\"").append("Special-header-1;Special-header-2").append("\"");
         Header authorizationHeader = mockHeader(authHeader.toString());
         when(request.getFirstHeader("Authorization")).thenReturn(authorizationHeader);
 
         Header contentTypeHeader = mockHeader("text/plain");
         when(request.getFirstHeader("Content-Type")).thenReturn(contentTypeHeader);
-        Header xAuthorizationTimestampHeader = mockHeader("1432075982");
+        Header xAuthorizationTimestampHeader = mockHeader("1456356071");
         when(request.getFirstHeader("X-Authorization-Timestamp")).thenReturn(
             xAuthorizationTimestampHeader);
-        Header custom1Header = mockHeader("Value1");
-        when(request.getFirstHeader("Custom1")).thenReturn(custom1Header);
+        Header custom1Header = mockHeader("special_header_1_value");
+        when(request.getFirstHeader("Special-header-1")).thenReturn(custom1Header);
+        Header custom2Header = mockHeader("special_header_2_value");
+        when(request.getFirstHeader("Special-header-2")).thenReturn(custom2Header);
 
         HttpContext context = mock(HttpContext.class);
 
