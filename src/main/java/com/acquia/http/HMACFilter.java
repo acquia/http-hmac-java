@@ -29,44 +29,42 @@ public abstract class HMACFilter implements Filter {
      * that are used in the construction of the message that will be encrypted.
      */
     public static final String FILTER_CONFIG_CUSTOMER_HEADERS = "customHeaders";
-    
+
     /**
      * The config parameter that defines the name of the algorithm used to create the HMAC.
      */
     public static final String FILTER_CONFIG_ALGORITHM = "algorithm";
-    
+
     /**
      * The Algorithm used to create the HMAC.
      */
     HMACAlgorithm algorithm;
-    
+
     /**
      * The list of custom HTTP headers used to construct the message that will be encrypted.
      */
     List<String> customHeaders;
-    
+
     @Override
     public void init(FilterConfig config) throws ServletException {
         String customHeadersList = config.getInitParameter(FILTER_CONFIG_CUSTOMER_HEADERS);
-        if ( customHeadersList != null ) {
-            this.customHeaders = new ArrayList<String>( Arrays.asList( customHeadersList.split(",") ) );
-        }
-        else {
+        if (customHeadersList != null) {
+            this.customHeaders = new ArrayList<String>(Arrays.asList(customHeadersList.split(",")));
+        } else {
             this.customHeaders = new ArrayList<String>();
         }
         HMACAlgorithmFactory algorithmFactory = new HMACAlgorithmFactory();
         String algorithmName = config.getInitParameter(FILTER_CONFIG_ALGORITHM);
         this.algorithm = algorithmFactory.createAlgorithm(algorithmName);
     }
-    
 
     @Override
     public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
             throws IOException, ServletException {
-        if ( req instanceof HttpServletRequest ) {
-            HttpServletRequest request   = (HttpServletRequest) req;
+        if (req instanceof HttpServletRequest) {
+            HttpServletRequest request = (HttpServletRequest) req;
             HttpServletResponse response = (HttpServletResponse) res;
-            
+
             String authHeader = request.getHeader("Authorization");
 
             if (authHeader != null) {
@@ -75,7 +73,7 @@ public abstract class HMACFilter implements Filter {
 
                 if (st.hasMoreTokens()) {
 
-                    String provider = st.nextToken();
+                    String realm = st.nextToken();
                     String credentials = st.nextToken();
                     int index = credentials.indexOf(":");
 
@@ -88,15 +86,16 @@ public abstract class HMACFilter implements Filter {
                     String accessKey = credentials.substring(0, index).trim();
                     String signature = credentials.substring(index + 1).trim();
 
-                    String secretKey = getSecretKey( accessKey );
+                    String secretKey = getSecretKey(accessKey);
 
                     HMACMessageCreator messageCreator = new HMACMessageCreator();
-                    String message = messageCreator.createMessage(request, this.customHeaders );
+                    String message = messageCreator.createMessage(request, this.customHeaders);
                     try {
-                        String calculatedSignature = this.algorithm.encryptMessage(secretKey, message);
-    
+                        String calculatedSignature = this.algorithm.encryptMessage(secretKey,
+                            message);
+
                         if (signature.compareTo(calculatedSignature) != 0) {
-                           
+
                             response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
                                 "Error: Invalid authentication token.");
                             return;
@@ -104,8 +103,7 @@ public abstract class HMACFilter implements Filter {
                             chain.doFilter(req, res);
                             return;
                         }
-                    }
-                    catch (SignatureException e ) {
+                    } catch(SignatureException e) {
                         throw new IOException("Could not create calculated signature", e);
                     }
                 }
@@ -116,19 +114,18 @@ public abstract class HMACFilter implements Filter {
             return;
         }
 
-
     }
 
     @Override
     public void destroy() {
 
     }
-    
+
     /** 
      * Returns the secret key for the given access key.
      * 
      * @param accessKey Access Key
      * @return Secret Key
      */
-    protected abstract String getSecretKey ( String accessKey );
+    protected abstract String getSecretKey(String accessKey);
 }

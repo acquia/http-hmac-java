@@ -28,7 +28,7 @@ public abstract class HMACHttpServlet extends HttpServlet {
      * that are used in the construction of the encrypted message.
      */
     public static final String SERVLET_CONFIG_CUSTOMER_HEADERS = "customHeaders";
-    
+
     /**
      * The config parameter that defines the name of the algorithm used the encrypt the message.
      */
@@ -38,17 +38,17 @@ public abstract class HMACHttpServlet extends HttpServlet {
      * The Algorithm used to create the HMAC.
      */
     HMACAlgorithm algorithm;
-    
+
     /**
      * The list of custom HTTP headers used to construct the message that will be encrypted.
      */
     List<String> customHeaders = new ArrayList<String>();
-    
+
     @Override
     public void init(ServletConfig config) throws ServletException {
         super.init(config);
         String customHeadersList = config.getInitParameter(SERVLET_CONFIG_CUSTOMER_HEADERS);
-        this.customHeaders = new ArrayList<String>( Arrays.asList( customHeadersList.split(",") ) );
+        this.customHeaders = new ArrayList<String>(Arrays.asList(customHeadersList.split(",")));
         HMACAlgorithmFactory algorithmFactory = new HMACAlgorithmFactory();
         String algorithmName = config.getInitParameter(SERVLET_CONFIG_ALGORITHM);
         this.algorithm = algorithmFactory.createAlgorithm(algorithmName);
@@ -57,10 +57,10 @@ public abstract class HMACHttpServlet extends HttpServlet {
     @Override
     public void service(ServletRequest req, ServletResponse res) throws ServletException,
             IOException {
-        if ( req instanceof HttpServletRequest ) {
-            HttpServletRequest request   = (HttpServletRequest) req;
+        if (req instanceof HttpServletRequest) {
+            HttpServletRequest request = (HttpServletRequest) req;
             HttpServletResponse response = (HttpServletResponse) res;
-            
+
             String authHeader = request.getHeader("Authorization");
 
             if (authHeader != null) {
@@ -69,7 +69,7 @@ public abstract class HMACHttpServlet extends HttpServlet {
 
                 if (st.hasMoreTokens()) {
 
-                    String provider = st.nextToken();
+                    String realm = st.nextToken();
                     String credentials = st.nextToken();
                     int index = credentials.indexOf(":");
 
@@ -82,21 +82,21 @@ public abstract class HMACHttpServlet extends HttpServlet {
                     String accessKey = credentials.substring(0, index).trim();
                     String signature = credentials.substring(index + 1).trim();
 
-                    String secretKey = getSecretKey( accessKey );
+                    String secretKey = getSecretKey(accessKey);
 
                     HMACMessageCreator messageCreator = new HMACMessageCreator();
-                    String message = messageCreator.createMessage(request, this.customHeaders );
+                    String message = messageCreator.createMessage(request, this.customHeaders);
                     try {
-                        String calculatedSignature = this.algorithm.encryptMessage(secretKey, message);
-    
+                        String calculatedSignature = this.algorithm.encryptMessage(secretKey,
+                            message);
+
                         if (signature.compareTo(calculatedSignature) != 0) {
-                           
+
                             response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
                                 "Error: Invalid authentication token.");
                             return;
                         }
-                    }
-                    catch (SignatureException e ) {
+                    } catch(SignatureException e) {
                         throw new IOException("Could not create calculated signature", e);
                     }
                 }
@@ -115,5 +115,5 @@ public abstract class HMACHttpServlet extends HttpServlet {
      * @param accessKey Access Key
      * @return Secret Key
      */
-    protected abstract String getSecretKey( String accessKey );
+    protected abstract String getSecretKey(String accessKey);
 }
