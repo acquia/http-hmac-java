@@ -19,30 +19,30 @@ public class SHAHMACAlgorithm implements HMACAlgorithm {
      * The name of the algorithm. See Java Cryptography Architecture Reference Guide for valid names.
      */
     String algorithm = null;
-    
+
     /**
      * Constructs a new SHAHMACAlgorithm with the given size.
      * 
      * @param shaSize key size
      */
-    protected SHAHMACAlgorithm( int shaSize ) {
-        if ( shaSize != 1 && shaSize != 256 && shaSize != 384 && shaSize != 512 ) {
-            throw new IllegalArgumentException("Size "+shaSize+" not supported (only 1, 256, 384 and 512 are supported)");
+    protected SHAHMACAlgorithm(int shaSize) {
+        if (shaSize != 1 && shaSize != 256 && shaSize != 384 && shaSize != 512) {
+            throw new IllegalArgumentException("Size " + shaSize
+                    + " not supported (only 1, 256, 384 and 512 are supported)");
         }
-        algorithm = "HmacSHA"+Integer.toString(shaSize);
+        algorithm = "HmacSHA" + Integer.toString(shaSize);
     }
-    
+
     @Override
     public String encryptMessage(String secretKey, String message) throws SignatureException {
         String result;
         try {
-            SecretKeySpec signingKey = new SecretKeySpec(secretKey.getBytes(), algorithm);
-
             Mac mac = Mac.getInstance(algorithm);
+            byte[] decodedSecretKey = Base64.decodeBase64(secretKey);
+            SecretKeySpec signingKey = new SecretKeySpec(decodedSecretKey, algorithm);
             mac.init(signingKey);
 
             byte[] rawHmac = mac.doFinal(message.getBytes());
-
             result = Base64.encodeBase64String(rawHmac);
 
         } catch(Exception e) {

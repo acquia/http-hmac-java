@@ -1,18 +1,20 @@
 package com.acquia.http;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
 
 import javax.servlet.http.HttpServletRequest;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
@@ -25,6 +27,8 @@ import org.apache.http.HttpRequest;
  *
  */
 public class HMACMessageCreator {
+
+    private static final String ENCODING_UTF_8 = "UTF-8";
 
     private static final String PARAMETER_AUTHORIZATION = "Authorization";
     private static final String PARAMETER_X_AUTHORIZATION_TIMESTAMP = "X-Authorization-Timestamp";
@@ -43,7 +47,8 @@ public class HMACMessageCreator {
     public String createMessage(HttpServletRequest request) throws IOException {
         String httpVerb = request.getMethod().toUpperCase();
 
-        String host = request.getServerName();
+        int port = request.getServerPort();
+        String host = request.getServerName() + (port > 0 ? ":" + port : "");
         String path = request.getRequestURI();
         String queryParameters = request.getQueryString();
         if (queryParameters == null) {
@@ -82,7 +87,8 @@ public class HMACMessageCreator {
         String queryParameters = "";
         try {
             URI uri = new URI(request.getRequestLine().getUri());
-            host = uri.getHost();
+            int port = uri.getPort();
+            host = uri.getHost() + (port > 0 ? ":" + port : "");
             path = uri.getPath();
             queryParameters = uri.getQuery();
             if (queryParameters == null) {
@@ -141,6 +147,7 @@ public class HMACMessageCreator {
         result.append(httpVerb.toUpperCase()).append("\n");
         result.append(host.toLowerCase()).append("\n");
         result.append(path).append("\n");
+        //        result.append(URLEncoder.encode(queryParameters, ENCODING_UTF_8).replace("+", "%20")).append("\n");
         result.append(queryParameters).append("\n");
 
         //adding Authorization header parameters
@@ -152,7 +159,8 @@ public class HMACMessageCreator {
                 result.append("&");
             }
             result.append(headerKey.toLowerCase()).append("=").append(
-                authorizationHeaderParameterMap.get(headerKey));
+                URLEncoder.encode(authorizationHeaderParameterMap.get(headerKey), ENCODING_UTF_8).replace(
+                    "+", "%20"));
             isFirst = false;
         }
         result.append("\n");
@@ -170,46 +178,55 @@ public class HMACMessageCreator {
         result.append(xAuthorizationTimestamp);
 
         //adding more if needed
-        String requestBodyString = this.convertInputStreamIntoString(requestBody);
-        if (this.isPassingRequestBody(httpVerb, requestBodyString)) {
-            result.append("\n").append(contentType);
+        byte[] requestBodyBytes = this.convertInputStreamIntoBtyeArray(requestBody);
+        if (this.isPassingRequestBody(httpVerb, requestBodyBytes)) {
+            result.append("\n").append(contentType.toLowerCase());
 
             //calculate body hash
-            String bodyHash = DigestUtils.sha256Hex(requestBodyString); //v2 specification requires base64 encoded SHA-256
+            byte[] encBody = DigestUtils.sha256(requestBodyBytes);
+            String bodyHash = Base64.encodeBase64String(encBody); //v2 specification requires base64 encoded SHA-256
             result.append("\n").append(bodyHash);
         }
-        System.out.println(result);
+        //        System.out.println("Message to be encrypted:\n" + result);
         return result.toString();
     }
 
     /**
-     * Convert InputStream into String
+     * Convert InputStream into byte[]
      * 
      * @param inputStream
      * @return
+     * @throws IOException 
      */
-    private String convertInputStreamIntoString(InputStream inputStream) {
-        // Here we have used delimiter as "\A" which is boundary match for beginning of the input as declared in java.util.regex.Pattern
-        //  and that's why Scanner is returning whole String form InputStream.
-        // Source: http://javarevisited.blogspot.ca/2012/08/convert-inputstream-to-string-java-example-tutorial.html
-        Scanner scanner = new Scanner(inputStream, "UTF-8");
-        String inputStreamString = scanner.useDelimiter("\\A").next();
-        scanner.close();
-        return inputStreamString;
+    private byte[] convertInputStreamIntoBtyeArray(InputStream inputStream) throws IOException {
+        if (inputStream == null) {
+            return null;
+        }
+
+        byte[] byteChunk = new byte[1000];
+        int length = -1;
+
+        ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+        while ((length = inputStream.read(byteChunk)) != -1) {
+            byteOutputStream.write(byteChunk, 0, length);
+        }
+        byteOutputStream.flush();
+        byteOutputStream.close();
+        return byteOutputStream.toByteArray();
     }
 
     /**
      * Method to help check if requestBody needs to be passed or can be omitted
      * 
      * @param httpVerb
-     * @param requestBodyString
+     * @param requestBodyBytes
      * @return
      */
-    private boolean isPassingRequestBody(String httpVerb, String requestBodyString) {
+    private boolean isPassingRequestBody(String httpVerb, byte[] requestBodyBytes) {
         if (httpVerb.toUpperCase().equals("GET") || httpVerb.toUpperCase().equals("HEAD")) {
             return false;
         }
 
-        return requestBodyString != null && requestBodyString.length() > 0;
+        return requestBodyBytes != null && requestBodyBytes.length > 0;
     }
 }

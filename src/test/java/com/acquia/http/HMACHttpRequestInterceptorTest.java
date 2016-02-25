@@ -24,39 +24,29 @@ import org.mockito.stubbing.Answer;
 public class HMACHttpRequestInterceptorTest {
 
     @Test
-    public void testAddAuthorizationHeader() throws IOException, HttpException {
+    public void testAddAuthorizationHeaderGet() throws IOException, HttpException {
         //base Authorization parameter
-        String realm = "Acquia";
-        String accessKey = "ABCD-1234";
-        String nonce = "c3df8396-b297-425f-c19c-634d6ca25d39";
+        String realm = "Pipet service";
+        String accessKey = "efdde334-fe7b-11e4-a322-1697f925ec7b";
+        String nonce = "d1954337-5319-4821-8427-115542e08d10";
         String version = "2.0";
-        String xAuthorizationTimestamp = "1456417334";
+        String xAuthorizationTimestamp = "1432075982";
 
-        String secretKey = "d175024aa4c4d8b312a7114687790c772dd94fb725cb68016aaeae5a76d68102";
+        String httpMethod = "GET";
+        String uri = "https://example.acquiapipet.net/v1.0/task-status/133?limit=10";
+        String secretKey = "W5PeGMxSItNerkNFqQMfYiJvH14WzVJMy54CPoTAYoI=";
 
         HMACHttpRequestInterceptor authorizationInterceptor = new HMACHttpRequestInterceptor(realm,
             accessKey, secretKey, "SHA256");
-        //        authorizationInterceptor.setCustomHeaders(new String[] { "Special-header-1",
-        //                "Special-header-2" });
         authorizationInterceptor.setCustomHeaders(new String[] {});
         HttpEntityEnclosingRequest request = mock(HttpEntityEnclosingRequest.class);
 
         RequestLine requestLine = mock(RequestLine.class);
-        when(requestLine.getMethod()).thenReturn("GET");
-        when(requestLine.getUri()).thenReturn(
-            "http://acquia.com/resource=1?first_word=Hello&second_word=World");
+        when(requestLine.getMethod()).thenReturn(httpMethod);
+        when(requestLine.getUri()).thenReturn(uri);
         when(request.getRequestLine()).thenReturn(requestLine);
 
-        final ByteArrayInputStream realInputStream = new ByteArrayInputStream(
-            "test content".getBytes());
-        InputStream requestInputStream = new InputStream() {
-            @Override
-            public int read() {
-                return realInputStream.read();
-            }
-        };
         HttpEntity requestEntity = mock(HttpEntity.class);
-        when(requestEntity.getContent()).thenReturn(requestInputStream);
         when(request.getEntity()).thenReturn(requestEntity);
 
         StringBuilder authHeader = new StringBuilder();
@@ -73,10 +63,6 @@ public class HMACHttpRequestInterceptorTest {
         Header xAuthorizationTimestampHeader = mockHeader(xAuthorizationTimestamp);
         when(request.getFirstHeader("X-Authorization-Timestamp")).thenReturn(
             xAuthorizationTimestampHeader);
-        Header custom1Header = mockHeader("special_header_1_value");
-        when(request.getFirstHeader("Special-header-1")).thenReturn(custom1Header);
-        Header custom2Header = mockHeader("special_header_2_value");
-        when(request.getFirstHeader("Special-header-2")).thenReturn(custom2Header);
 
         HttpContext context = mock(HttpContext.class);
 
@@ -96,10 +82,84 @@ public class HMACHttpRequestInterceptorTest {
         authorizationInterceptor.process(request, context);
 
         String calculatedAuthorization = calcAuthorizationHeader.toString();
-        System.out.println("auth header\n" + calculatedAuthorization);
         Map<String, String> authorizationParameterMap = HMACUtil.convertAuthorizationIntoParameterMap(calculatedAuthorization);
 
-        Assert.assertEquals("tgrFkCH7uSeUkPv9Z1FfyQBMPahiK8lRp/ecyp3BDys=",
+        Assert.assertEquals("MRlPr/Z1WQY2sMthcaEqETRMw4gPYXlPcTpaLWS2gcc=",
+            authorizationParameterMap.get("signature"));
+    }
+
+    @Test
+    public void testAddAuthorizationHeaderPost() throws IOException, HttpException {
+        //base Authorization parameter
+        String realm = "Plexus";
+        String accessKey = "f0d16792-cdc9-4585-a5fd-bae3d898d8c5";
+        String nonce = "64d02132-40bf-4fce-85bf-3f1bb1bfe7dd";
+        String version = "2.0";
+        String xAuthorizationTimestamp = "1449578521";
+
+        String httpMethod = "POST";
+        String uri = "http://54.154.147.142:3000/register";
+        String secretKey = "eox4TsBBPhpi737yMxpdBbr3sgg/DEC4m47VXO0B8qJLsbdMsmN47j/ZF/EFpyUKtAhm0OWXMGaAjRaho7/93Q==";
+
+        String contentType = "application/json";
+        String reqBody = "{\"method\":\"hi.bob\",\"params\":[\"5\",\"4\",\"8\"]}";
+
+        HMACHttpRequestInterceptor authorizationInterceptor = new HMACHttpRequestInterceptor(realm,
+            accessKey, secretKey, "SHA256");
+        authorizationInterceptor.setCustomHeaders(new String[] {});
+        HttpEntityEnclosingRequest request = mock(HttpEntityEnclosingRequest.class);
+
+        RequestLine requestLine = mock(RequestLine.class);
+        when(requestLine.getMethod()).thenReturn(httpMethod);
+        when(requestLine.getUri()).thenReturn(uri);
+        when(request.getRequestLine()).thenReturn(requestLine);
+
+        final ByteArrayInputStream realInputStream = new ByteArrayInputStream(reqBody.getBytes());
+        InputStream requestInputStream = new InputStream() {
+            @Override
+            public int read() {
+                return realInputStream.read();
+            }
+        };
+        HttpEntity requestEntity = mock(HttpEntity.class);
+        when(requestEntity.getContent()).thenReturn(requestInputStream);
+        when(request.getEntity()).thenReturn(requestEntity);
+
+        StringBuilder authHeader = new StringBuilder();
+        authHeader.append("acquia-http-hmac realm=\"").append(realm).append("\",");
+        authHeader.append("id=\"").append(accessKey).append("\",");
+        authHeader.append("nonce=\"").append(nonce).append("\",");
+        authHeader.append("version=\"").append(version).append("\",");
+        authHeader.append("headers=\"").append("").append("\"");
+        Header authorizationHeader = mockHeader(authHeader.toString());
+        when(request.getFirstHeader("Authorization")).thenReturn(authorizationHeader);
+
+        Header contentTypeHeader = mockHeader(contentType);
+        when(request.getFirstHeader("Content-Type")).thenReturn(contentTypeHeader);
+        Header xAuthorizationTimestampHeader = mockHeader(xAuthorizationTimestamp);
+        when(request.getFirstHeader("X-Authorization-Timestamp")).thenReturn(
+            xAuthorizationTimestampHeader);
+        HttpContext context = mock(HttpContext.class);
+
+        final StringBuilder calcAuthorizationHeader = new StringBuilder();
+        doAnswer(new Answer<Void>() {
+            public Void answer(InvocationOnMock invocation) {
+                Object[] args = invocation.getArguments();
+                String headerKey = (String) args[0];
+                String valueKey = (String) args[1];
+                if ("Authorization".equals(headerKey)) {
+                    calcAuthorizationHeader.append(valueKey);
+                }
+                return null;
+            }
+        }).when(request).setHeader((String) anyObject(), (String) anyObject());
+
+        authorizationInterceptor.process(request, context);
+
+        String calculatedAuthorization = calcAuthorizationHeader.toString();
+        Map<String, String> authorizationParameterMap = HMACUtil.convertAuthorizationIntoParameterMap(calculatedAuthorization);
+
+        Assert.assertEquals("4VtBHjqrdDeYrJySoJVDUHpN9u3vyTsyOLz4chezi98=",
             authorizationParameterMap.get("signature"));
     }
 
