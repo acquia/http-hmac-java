@@ -178,7 +178,7 @@ public class HMACMessageCreator {
             String bodyHash = DigestUtils.sha256Hex(requestBodyString); //v2 specification requires base64 encoded SHA-256
             result.append("\n").append(bodyHash);
         }
-        //        System.out.println(result);
+        System.out.println(result);
         return result.toString();
     }
 

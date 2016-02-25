@@ -28,13 +28,17 @@ public class HMACHttpRequestInterceptorTest {
         //base Authorization parameter
         String realm = "Acquia";
         String accessKey = "ABCD-1234";
-        String nonce = "6b996560-6342-4f57-9ef0-fdd6c2b61b29";
+        String nonce = "c3df8396-b297-425f-c19c-634d6ca25d39";
         String version = "2.0";
+        String xAuthorizationTimestamp = "1456417334";
+
+        String secretKey = "d175024aa4c4d8b312a7114687790c772dd94fb725cb68016aaeae5a76d68102";
 
         HMACHttpRequestInterceptor authorizationInterceptor = new HMACHttpRequestInterceptor(realm,
-            accessKey, "secret-key", "SHA256");
-        authorizationInterceptor.setCustomHeaders(new String[] { "Special-header-1",
-                "Special-header-2" });
+            accessKey, secretKey, "SHA256");
+        //        authorizationInterceptor.setCustomHeaders(new String[] { "Special-header-1",
+        //                "Special-header-2" });
+        authorizationInterceptor.setCustomHeaders(new String[] {});
         HttpEntityEnclosingRequest request = mock(HttpEntityEnclosingRequest.class);
 
         RequestLine requestLine = mock(RequestLine.class);
@@ -60,13 +64,13 @@ public class HMACHttpRequestInterceptorTest {
         authHeader.append("id=\"").append(accessKey).append("\",");
         authHeader.append("nonce=\"").append(nonce).append("\",");
         authHeader.append("version=\"").append(version).append("\",");
-        authHeader.append("headers=\"").append("Special-header-1;Special-header-2").append("\"");
+        authHeader.append("headers=\"").append("").append("\"");
         Header authorizationHeader = mockHeader(authHeader.toString());
         when(request.getFirstHeader("Authorization")).thenReturn(authorizationHeader);
 
         Header contentTypeHeader = mockHeader("text/plain");
         when(request.getFirstHeader("Content-Type")).thenReturn(contentTypeHeader);
-        Header xAuthorizationTimestampHeader = mockHeader("1456356071");
+        Header xAuthorizationTimestampHeader = mockHeader(xAuthorizationTimestamp);
         when(request.getFirstHeader("X-Authorization-Timestamp")).thenReturn(
             xAuthorizationTimestampHeader);
         Header custom1Header = mockHeader("special_header_1_value");
@@ -92,6 +96,7 @@ public class HMACHttpRequestInterceptorTest {
         authorizationInterceptor.process(request, context);
 
         String calculatedAuthorization = calcAuthorizationHeader.toString();
+        System.out.println("auth header\n" + calculatedAuthorization);
         Map<String, String> authorizationParameterMap = HMACUtil.convertAuthorizationIntoParameterMap(calculatedAuthorization);
 
         Assert.assertEquals("tgrFkCH7uSeUkPv9Z1FfyQBMPahiK8lRp/ecyp3BDys=",
