@@ -23,23 +23,40 @@ public class HMACFilterTest {
 
     @Test
     public void testSuccessFilter() throws IOException, ServletException {
+        //base Authorization parameter
+        String realm = "Plexus";
+        String accessKey = "f0d16792-cdc9-4585-a5fd-bae3d898d8c5";
+        String nonce = "64d02132-40bf-4fce-85bf-3f1bb1bfe7dd";
+        String version = "2.0";
+        String xAuthorizationTimestamp = "1449578521";
+
+        String httpMethod = "POST";
+        String uri = "http://54.154.147.142:3000/register";
+        String secretKey = "eox4TsBBPhpi737yMxpdBbr3sgg/DEC4m47VXO0B8qJLsbdMsmN47j/ZF/EFpyUKtAhm0OWXMGaAjRaho7/93Q==";
+
+        String contentType = "application/json";
+        String reqBody = "{\"method\":\"hi.bob\",\"params\":[\"5\",\"4\",\"8\"]}";
+
+        String signature = "4VtBHjqrdDeYrJySoJVDUHpN9u3vyTsyOLz4chezi98=";
+
         HMACFilter testFilter = new HMACFilter() {
 
             @Override
             protected String getSecretKey(String accessKey) {
-                if ("1".equals(accessKey)) {
-                    return "secret-key";
+                if ("f0d16792-cdc9-4585-a5fd-bae3d898d8c5".equals(accessKey)) {
+                    return "eox4TsBBPhpi737yMxpdBbr3sgg/DEC4m47VXO0B8qJLsbdMsmN47j/ZF/EFpyUKtAhm0OWXMGaAjRaho7/93Q==";
                 }
                 return null;
             }
         };
         FilterConfig filterConfig = mock(FilterConfig.class);
-        when(filterConfig.getInitParameter("customHeaders")).thenReturn("Custom1");
         when(filterConfig.getInitParameter("algorithm")).thenReturn("SHA256");
         testFilter.init(filterConfig);
 
-        final ByteArrayInputStream realInputStream = new ByteArrayInputStream(
-            "test content".getBytes());
+        StringBuilder authBuilder = HMACUtil.constructAuthorizationString(realm, accessKey, nonce,
+            version, /*headers*/null, signature);
+
+        final ByteArrayInputStream realInputStream = new ByteArrayInputStream(reqBody.getBytes());
         ServletInputStream requestInputStream = new ServletInputStream() {
             @Override
             public int read() {
@@ -48,44 +65,59 @@ public class HMACFilterTest {
         };
 
         HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getMethod()).thenReturn("GET");
+        when(request.getHeader("Authorization")).thenReturn(authBuilder.toString());
+        when(request.getHeader("X-Authorization-Timestamp")).thenReturn(xAuthorizationTimestamp);
+        when(request.getMethod()).thenReturn(httpMethod);
+        when(request.getServerName()).thenReturn("54.154.147.142:3000");
+        when(request.getRequestURI()).thenReturn("/register");
+        when(request.getQueryString()).thenReturn("");
+        when(request.getContentType()).thenReturn(contentType);
         when(request.getInputStream()).thenReturn(requestInputStream);
-        when(request.getHeader("Content-Type")).thenReturn("text/plain");
-        when(request.getHeader("X-Authorization-Timestamp")).thenReturn("1432075982");
-        when(request.getHeader("Custom1")).thenReturn("Value1");
-        when(request.getServerName()).thenReturn("acquia.com");
-        when(request.getRequestURI()).thenReturn("/resource/1");
-        when(request.getQueryString()).thenReturn("key=value");
-        when(request.getHeader("Authorization")).thenReturn("Acquia 1:0Qub9svYlxjAr8OO7N0/3u0sohs=");
 
         HttpServletResponse response = mock(HttpServletResponse.class);
 
         FilterChain filterChain = mock(FilterChain.class);
         testFilter.doFilter(request, response, filterChain);
 
-        //verify(response, never()).sendError(anyInt(), (String) anyObject());
         verify(filterChain).doFilter(request, response);
     }
 
     @Test
     public void testFailureFilter() throws IOException, ServletException {
+        //base Authorization parameter
+        String realm = "Plexus";
+        String accessKey = "f0d16792-cdc9-4585-a5fd-bae3d898d8c5";
+        String nonce = "64d02132-40bf-4fce-85bf-3f1bb1bfe7dd";
+        String version = "2.0";
+        String xAuthorizationTimestamp = "1449578521";
+
+        String httpMethod = "POST";
+        String uri = "http://54.154.147.142:3000/register";
+        String secretKey = "eox4TsBBPhpi737yMxpdBbr3sgg/DEC4m47VXO0B8qJLsbdMsmN47j/ZF/EFpyUKtAhm0OWXMGaAjRaho7/93Q==";
+
+        String contentType = "application/json";
+        String reqBody = "{\"method\":\"hi.bob\",\"params\":[\"5\",\"4\",\"8\"]}";
+
+        String signature = "4VtBHjqrdDeYrJySoJVDUHpN9u3vyTsyOLz4chezi98=";
+
         HMACFilter testFilter = new HMACFilter() {
 
             @Override
             protected String getSecretKey(String accessKey) {
-                if ("1".equals(accessKey)) {
-                    return "other-key";
+                if ("f0d16792-cdc9-4585-a5fd-bae3d898d8c5".equals(accessKey)) {
+                    return "other-key"; //invalid bogus key
                 }
                 return null;
             }
         };
         FilterConfig filterConfig = mock(FilterConfig.class);
-        when(filterConfig.getInitParameter("customHeaders")).thenReturn("Custom1");
         when(filterConfig.getInitParameter("algorithm")).thenReturn("SHA256");
         testFilter.init(filterConfig);
 
-        final ByteArrayInputStream realInputStream = new ByteArrayInputStream(
-            "test content".getBytes());
+        StringBuilder authBuilder = HMACUtil.constructAuthorizationString(realm, accessKey, nonce,
+            version, /*headers*/null, signature);
+
+        final ByteArrayInputStream realInputStream = new ByteArrayInputStream(reqBody.getBytes());
         ServletInputStream requestInputStream = new ServletInputStream() {
             @Override
             public int read() {
@@ -94,15 +126,14 @@ public class HMACFilterTest {
         };
 
         HttpServletRequest request = mock(HttpServletRequest.class);
-        when(request.getMethod()).thenReturn("GET");
+        when(request.getHeader("Authorization")).thenReturn(authBuilder.toString());
+        when(request.getHeader("X-Authorization-Timestamp")).thenReturn(xAuthorizationTimestamp);
+        when(request.getMethod()).thenReturn(httpMethod);
+        when(request.getServerName()).thenReturn("54.154.147.142:3000");
+        when(request.getRequestURI()).thenReturn("/register");
+        when(request.getQueryString()).thenReturn("");
+        when(request.getContentType()).thenReturn(contentType);
         when(request.getInputStream()).thenReturn(requestInputStream);
-        when(request.getHeader("Content-Type")).thenReturn("text/plain");
-        when(request.getHeader("X-Authorization-Timestamp")).thenReturn("1432075982");
-        when(request.getHeader("Custom1")).thenReturn("Value1");
-        when(request.getServerName()).thenReturn("acquia.com");
-        when(request.getRequestURI()).thenReturn("/resource/1");
-        when(request.getQueryString()).thenReturn("key=value");
-        when(request.getHeader("Authorization")).thenReturn("Acquia 1:0Qub9svYlxjAr8OO7N0/3u0sohs=");
 
         HttpServletResponse response = mock(HttpServletResponse.class);
 

@@ -106,15 +106,10 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
 
     @Override
     public void process(HttpRequest request, HttpContext context) throws HttpException, IOException {
-
-        StringBuilder authHeader = new StringBuilder();
-        authHeader.append("acquia-http-hmac realm=\"").append(this.realm).append("\",");
-        authHeader.append("id=\"").append(this.accessKey).append("\",");
-        authHeader.append("nonce=\"").append(UUID.randomUUID().toString()).append("\",");
-        authHeader.append("version=\"").append(VERSION).append("\",");
-        authHeader.append("headers=\"").append(this.implodeStringArray(this.customHeaders, ";")).append(
-            "\"");
-        request.addHeader("Authorization", authHeader.toString()); //the info provided so far will need to be encrypted
+        StringBuilder authBuilder = HMACUtil.constructAuthorizationString(this.realm,
+            this.accessKey, UUID.randomUUID().toString(), VERSION,
+            this.implodeStringArray(this.customHeaders, ";"), /*signature*/null);
+        request.addHeader("Authorization", authBuilder.toString()); //the info provided so far will need to be encrypted
 
         HMACMessageCreator messageCreator = new HMACMessageCreator();
         String message = messageCreator.createMessage(request);
@@ -126,9 +121,9 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
             throw new IOException("Could not encrypt message", e);
         }
         //        System.out.println("Encrypted message:\n" + encryptedMessage);
-        authHeader.append(",signature=\"").append(encryptedMessage).append("\"");
 
-        request.setHeader("Authorization", authHeader.toString()); //set it again, this time with encrypted signature
+        authBuilder.append(",signature=\"").append(encryptedMessage).append("\"");
+        request.setHeader("Authorization", authBuilder.toString()); //set it again, this time with encrypted signature
     }
 
 }

@@ -18,6 +18,36 @@ import org.apache.http.HttpRequest;
 public class HMACUtil {
 
     /**
+     * Construct Authorization content
+     * 
+     * @param realm
+     * @param id
+     * @param nonce
+     * @param version
+     * @param headers; optional: omitted if null
+     * @param signature; optional: omitted if null
+     * @return
+     */
+    public static StringBuilder constructAuthorizationString(String realm, String id, String nonce,
+            String version, String headers, String signature) {
+        StringBuilder authBuilder = new StringBuilder();
+        authBuilder.append("acquia-http-hmac realm=\"").append(realm).append("\",");
+        authBuilder.append("id=\"").append(id).append("\",");
+        authBuilder.append("nonce=\"").append(nonce).append("\",");
+        authBuilder.append("version=\"").append(version).append("\"");
+
+        if (headers != null && headers.length() > 0) {
+            authBuilder.append(",headers=\"").append(headers).append("\"");
+        }
+
+        if (signature != null && signature.length() > 0) {
+            authBuilder.append(",signature=\"").append(signature).append("\"");
+        }
+
+        return authBuilder;
+    }
+
+    /**
      * This method converts an Authorization string into a key-value pair Map
      * 
      * The input format:
@@ -75,12 +105,14 @@ public class HMACUtil {
     public static Map<String, String> buildCustomHeaderMap(HttpServletRequest request,
             String customHeaders) {
         Map<String, String> theMap = new HashMap<String, String>();
-        for (String headerName : customHeaders.split(";")) {
-            String headerValue = request.getHeader(headerName);
-            if (headerValue == null) {
-                continue; //FIXME: throw error? custom parameter cannot be found
+        if (customHeaders != null && customHeaders.length() > 0) {
+            for (String headerName : customHeaders.split(";")) {
+                String headerValue = request.getHeader(headerName);
+                if (headerValue == null) {
+                    continue; //FIXME: throw error? custom parameter cannot be found
+                }
+                theMap.put(headerName.toLowerCase(), headerValue);
             }
-            theMap.put(headerName.toLowerCase(), headerValue);
         }
         return theMap;
     }
@@ -95,12 +127,14 @@ public class HMACUtil {
      */
     public static Map<String, String> buildCustomHeaderMap(HttpRequest request, String customHeaders) {
         Map<String, String> theMap = new HashMap<String, String>();
-        for (String headerName : customHeaders.split(";")) {
-            Header customHeader = request.getFirstHeader(headerName);
-            if (customHeader == null) {
-                continue; //FIXME: throw error? custom parameter cannot be found
+        if (customHeaders != null && customHeaders.length() > 0) {
+            for (String headerName : customHeaders.split(";")) {
+                Header customHeader = request.getFirstHeader(headerName);
+                if (customHeader == null) {
+                    continue; //FIXME: throw error? custom parameter cannot be found
+                }
+                theMap.put(headerName.toLowerCase(), customHeader.getValue());
             }
-            theMap.put(headerName.toLowerCase(), customHeader.getValue());
         }
         return theMap;
     }

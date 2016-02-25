@@ -24,7 +24,7 @@ import org.mockito.stubbing.Answer;
 public class HMACHttpRequestInterceptorTest {
 
     @Test
-    public void testAddAuthorizationHeaderGet() throws IOException, HttpException {
+    public void testGetAuthorizationHeader() throws IOException, HttpException {
         //base Authorization parameter
         String realm = "Pipet service";
         String accessKey = "efdde334-fe7b-11e4-a322-1697f925ec7b";
@@ -49,17 +49,11 @@ public class HMACHttpRequestInterceptorTest {
         HttpEntity requestEntity = mock(HttpEntity.class);
         when(request.getEntity()).thenReturn(requestEntity);
 
-        StringBuilder authHeader = new StringBuilder();
-        authHeader.append("acquia-http-hmac realm=\"").append(realm).append("\",");
-        authHeader.append("id=\"").append(accessKey).append("\",");
-        authHeader.append("nonce=\"").append(nonce).append("\",");
-        authHeader.append("version=\"").append(version).append("\",");
-        authHeader.append("headers=\"").append("").append("\"");
-        Header authorizationHeader = mockHeader(authHeader.toString());
+        StringBuilder authBuilder = HMACUtil.constructAuthorizationString(realm, accessKey, nonce,
+            version, /*headers*/null, /*signature*/null);
+        Header authorizationHeader = mockHeader(authBuilder.toString());
         when(request.getFirstHeader("Authorization")).thenReturn(authorizationHeader);
 
-        Header contentTypeHeader = mockHeader("text/plain");
-        when(request.getFirstHeader("Content-Type")).thenReturn(contentTypeHeader);
         Header xAuthorizationTimestampHeader = mockHeader(xAuthorizationTimestamp);
         when(request.getFirstHeader("X-Authorization-Timestamp")).thenReturn(
             xAuthorizationTimestampHeader);
@@ -89,7 +83,7 @@ public class HMACHttpRequestInterceptorTest {
     }
 
     @Test
-    public void testAddAuthorizationHeaderPost() throws IOException, HttpException {
+    public void testPostAuthorizationHeader() throws IOException, HttpException {
         //base Authorization parameter
         String realm = "Plexus";
         String accessKey = "f0d16792-cdc9-4585-a5fd-bae3d898d8c5";
@@ -125,13 +119,9 @@ public class HMACHttpRequestInterceptorTest {
         when(requestEntity.getContent()).thenReturn(requestInputStream);
         when(request.getEntity()).thenReturn(requestEntity);
 
-        StringBuilder authHeader = new StringBuilder();
-        authHeader.append("acquia-http-hmac realm=\"").append(realm).append("\",");
-        authHeader.append("id=\"").append(accessKey).append("\",");
-        authHeader.append("nonce=\"").append(nonce).append("\",");
-        authHeader.append("version=\"").append(version).append("\",");
-        authHeader.append("headers=\"").append("").append("\"");
-        Header authorizationHeader = mockHeader(authHeader.toString());
+        StringBuilder authBuilder = HMACUtil.constructAuthorizationString(realm, accessKey, nonce,
+            version, /*headers*/null, /*signature*/null);
+        Header authorizationHeader = mockHeader(authBuilder.toString());
         when(request.getFirstHeader("Authorization")).thenReturn(authorizationHeader);
 
         Header contentTypeHeader = mockHeader(contentType);

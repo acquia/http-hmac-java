@@ -16,6 +16,7 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpRequest;
@@ -64,7 +65,7 @@ public class HMACMessageCreator {
             request, authorizationParameterMap.get(this.customHeaderName));
 
         String xAuthorizationTimestamp = request.getHeader(PARAMETER_X_AUTHORIZATION_TIMESTAMP);
-        String contentType = request.getHeader(PARAMETER_CONTENT_TYPE);
+        String contentType = request.getContentType();
         InputStream requestBody = request.getInputStream();
 
         return this.createMessage(httpVerb, host, path, queryParameters,
@@ -107,8 +108,15 @@ public class HMACMessageCreator {
             request, authorizationParameterMap.get(this.customHeaderName));
 
         String xAuthorizationTimestamp = request.getFirstHeader(PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue();
-        String contentType = request.getFirstHeader(PARAMETER_CONTENT_TYPE).getValue();
 
+        //optional content type
+        Header contentTypeHeader = request.getFirstHeader(PARAMETER_CONTENT_TYPE);
+        String contentType = "";
+        if (contentTypeHeader != null) {
+            contentType = contentTypeHeader.getValue();
+        }
+
+        //optional request body
         InputStream requestBody = null;
         if (request instanceof HttpEntityEnclosingRequest) {
             HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
