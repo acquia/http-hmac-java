@@ -7,7 +7,6 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -15,7 +14,6 @@ import java.util.Scanner;
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpRequest;
@@ -53,11 +51,11 @@ public class HMACMessageCreator {
         }
 
         String authorization = request.getHeader(PARAMETER_AUTHORIZATION);
-        Map<String, String> authorizationParameterMap = this.convertAuthorizationIntoParameterMap(authorization);
+        Map<String, String> authorizationParameterMap = HMACUtil.convertAuthorizationIntoParameterMap(authorization);
 
-        Map<String, String> authorizationHeaderParameterMap = this.buildBaseHeaderMap(
+        Map<String, String> authorizationHeaderParameterMap = HMACUtil.buildBaseHeaderMap(
             authorizationParameterMap, this.baseHeaderNames);
-        Map<String, String> authorizationCustomHeaderParameterMap = this.buildCustomHeaderMap(
+        Map<String, String> authorizationCustomHeaderParameterMap = HMACUtil.buildCustomHeaderMap(
             request, authorizationParameterMap.get(this.customHeaderName));
 
         String xAuthorizationTimestamp = request.getHeader(PARAMETER_X_AUTHORIZATION_TIMESTAMP);
@@ -67,73 +65,6 @@ public class HMACMessageCreator {
         return this.createMessage(httpVerb, host, path, queryParameters,
             authorizationHeaderParameterMap, authorizationCustomHeaderParameterMap,
             xAuthorizationTimestamp, contentType, requestBody);
-    }
-
-    /**
-     * This method converts an Authorization string into a key-value pair Map
-     * 
-     * The input format:
-     * acquia-http-hmac realm="Example",id="client-id",nonce="random-uuid",version="2.0",headers="custom1;custom2",signature="Signature"
-     * 
-     * The result of this call will be a Map in <key,value> pair of the parameters section (2nd token)
-     * This will discard the 1st token (i.e.: acquia-http-hmac will be discarded)
-     * 
-     * @param authString; in the format specified above
-     * @return
-     */
-    private Map<String, String> convertAuthorizationIntoParameterMap(String authString) {
-        int indexSpace = authString.indexOf(" ");
-        String authContent = authString.substring(indexSpace + 1);
-        String[] authParams = authContent.split(",");
-
-        Map<String, String> theMap = new HashMap<String, String>();
-        for (String param : authParams) {
-            String[] keyVal = param.split("=");
-            String key = keyVal[0];
-            String val = keyVal[1];
-            theMap.put(key.toLowerCase(), val.substring(1, val.length() - 1)); //remove "" from val
-        }
-        return theMap;
-    }
-
-    /**
-     * This method filters and picks up all key-pair values as specified from a list of baseHeaderNames
-     * 
-     * @param authorizationParameterMap
-     * @param baseHeaderNames
-     * @return
-     */
-    private Map<String, String> buildBaseHeaderMap(Map<String, String> authorizationParameterMap,
-            List<String> baseHeaderNames) {
-        Map<String, String> theMap = new HashMap<String, String>();
-        for (String headerName : baseHeaderNames) {
-            String headerValue = authorizationParameterMap.get(headerName);
-            if (headerValue == null) {
-                continue; //FIXME: throw error? base parameters are all required
-            }
-            theMap.put(headerName.toLowerCase(), headerValue);
-        }
-        return theMap;
-    }
-
-    /**
-     * Helper method to build Custom Header Map
-     * 
-     * @param request
-     * @param customHeaders
-     * @return
-     */
-    private Map<String, String> buildCustomHeaderMap(HttpServletRequest request,
-            String customHeaders) {
-        Map<String, String> theMap = new HashMap<String, String>();
-        for (String headerName : customHeaders.split(";")) {
-            String headerValue = request.getHeader(headerName);
-            if (headerValue == null) {
-                continue; //FIXME: throw error? custom parameter cannot be found
-            }
-            theMap.put(headerName.toLowerCase(), headerValue);
-        }
-        return theMap;
     }
 
     /**
@@ -162,11 +93,11 @@ public class HMACMessageCreator {
         }
 
         String authorization = request.getFirstHeader(PARAMETER_AUTHORIZATION).getValue();
-        Map<String, String> authorizationParameterMap = this.convertAuthorizationIntoParameterMap(authorization);
+        Map<String, String> authorizationParameterMap = HMACUtil.convertAuthorizationIntoParameterMap(authorization);
 
-        Map<String, String> authorizationHeaderParameterMap = this.buildBaseHeaderMap(
+        Map<String, String> authorizationHeaderParameterMap = HMACUtil.buildBaseHeaderMap(
             authorizationParameterMap, this.baseHeaderNames);
-        Map<String, String> authorizationCustomHeaderParameterMap = this.buildCustomHeaderMap(
+        Map<String, String> authorizationCustomHeaderParameterMap = HMACUtil.buildCustomHeaderMap(
             request, authorizationParameterMap.get(this.customHeaderName));
 
         String xAuthorizationTimestamp = request.getFirstHeader(PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue();
@@ -181,25 +112,6 @@ public class HMACMessageCreator {
         return this.createMessage(httpVerb, host, path, queryParameters,
             authorizationHeaderParameterMap, authorizationCustomHeaderParameterMap,
             xAuthorizationTimestamp, contentType, requestBody);
-    }
-
-    /**
-     * Helper method to build Custom Header Map
-     * 
-     * @param request
-     * @param customHeaders
-     * @return
-     */
-    private Map<String, String> buildCustomHeaderMap(HttpRequest request, String customHeaders) {
-        Map<String, String> theMap = new HashMap<String, String>();
-        for (String headerName : customHeaders.split(";")) {
-            Header customHeader = request.getFirstHeader(headerName);
-            if (customHeader == null) {
-                continue; //FIXME: throw error? custom parameter cannot be found
-            }
-            theMap.put(headerName.toLowerCase(), customHeader.getValue());
-        }
-        return theMap;
     }
 
     /**
@@ -266,7 +178,7 @@ public class HMACMessageCreator {
             String bodyHash = DigestUtils.sha256Hex(requestBodyString); //v2 specification requires base64 encoded SHA-256
             result.append("\n").append(bodyHash);
         }
-        System.out.println(result);
+        //        System.out.println(result);
         return result.toString();
     }
 

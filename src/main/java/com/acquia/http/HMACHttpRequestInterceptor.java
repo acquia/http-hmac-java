@@ -114,7 +114,7 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         authHeader.append("version=\"").append(VERSION).append("\",");
         authHeader.append("headers=\"").append(this.implodeStringArray(this.customHeaders, ";")).append(
             "\"");
-        request.setHeader("Authorization", authHeader.toString()); //the info provided so far will need to be encrypted
+        request.addHeader("Authorization", authHeader.toString()); //the info provided so far will need to be encrypted
 
         HMACMessageCreator messageCreator = new HMACMessageCreator();
         String message = messageCreator.createMessage(request);
@@ -124,7 +124,7 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         } catch(SignatureException e) {
             throw new IOException("Could not encrypt message", e);
         }
-        System.out.println(encryptedMessage);
+        //        System.out.println(encryptedMessage);
         authHeader.append(",signature=\"").append(encryptedMessage).append("\"");
 
         request.setHeader("Authorization", authHeader.toString()); //set it again, this time with encrypted signature

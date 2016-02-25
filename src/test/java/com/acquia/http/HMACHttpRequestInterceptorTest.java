@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Map;
 
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
@@ -86,11 +87,15 @@ public class HMACHttpRequestInterceptorTest {
                 }
                 return null;
             }
-        }).when(request).addHeader((String) anyObject(), (String) anyObject());
+        }).when(request).setHeader((String) anyObject(), (String) anyObject());
 
         authorizationInterceptor.process(request, context);
 
-        Assert.assertEquals("oqglS0eRzS1P2+R9AqqJUf4fNi0=", calcAuthorizationHeader.toString());
+        String calculatedAuthorization = calcAuthorizationHeader.toString();
+        Map<String, String> authorizationParameterMap = HMACUtil.convertAuthorizationIntoParameterMap(calculatedAuthorization);
+
+        Assert.assertEquals("tgrFkCH7uSeUkPv9Z1FfyQBMPahiK8lRp/ecyp3BDys=",
+            authorizationParameterMap.get("signature"));
     }
 
     private Header mockHeader(String value) {

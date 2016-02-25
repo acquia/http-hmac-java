@@ -2,10 +2,7 @@ package com.acquia.http;
 
 import java.io.IOException;
 import java.security.SignatureException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.StringTokenizer;
+import java.util.Map;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -25,12 +22,6 @@ import javax.servlet.http.HttpServletResponse;
 public abstract class HMACFilter implements Filter {
 
     /**
-     * The config parameter that defines a comma-separated list of custom HTTP headers 
-     * that are used in the construction of the message that will be encrypted.
-     */
-    public static final String FILTER_CONFIG_CUSTOMER_HEADERS = "customHeaders";
-
-    /**
      * The config parameter that defines the name of the algorithm used to create the HMAC.
      */
     public static final String FILTER_CONFIG_ALGORITHM = "algorithm";
@@ -40,19 +31,8 @@ public abstract class HMACFilter implements Filter {
      */
     HMACAlgorithm algorithm;
 
-    /**
-     * The list of custom HTTP headers used to construct the message that will be encrypted.
-     */
-    List<String> customHeaders;
-
     @Override
     public void init(FilterConfig config) throws ServletException {
-        String customHeadersList = config.getInitParameter(FILTER_CONFIG_CUSTOMER_HEADERS);
-        if (customHeadersList != null) {
-            this.customHeaders = new ArrayList<String>(Arrays.asList(customHeadersList.split(",")));
-        } else {
-            this.customHeaders = new ArrayList<String>();
-        }
         HMACAlgorithmFactory algorithmFactory = new HMACAlgorithmFactory();
         String algorithmName = config.getInitParameter(FILTER_CONFIG_ALGORITHM);
         this.algorithm = algorithmFactory.createAlgorithm(algorithmName);
@@ -66,46 +46,28 @@ public abstract class HMACFilter implements Filter {
             HttpServletResponse response = (HttpServletResponse) res;
 
             String authHeader = request.getHeader("Authorization");
-
             if (authHeader != null) {
+                Map<String, String> authorizationParameterMap = HMACUtil.convertAuthorizationIntoParameterMap(authHeader);
 
-                StringTokenizer st = new StringTokenizer(authHeader);
+                String accessKey = authorizationParameterMap.get("id");
+                String signature = authorizationParameterMap.get("signature");
 
-                if (st.hasMoreTokens()) {
+                String secretKey = getSecretKey(accessKey);
 
-                    String realm = st.nextToken();
-                    String credentials = st.nextToken();
-                    int index = credentials.indexOf(":");
-
-                    if (index == -1) {
+                HMACMessageCreator messageCreator = new HMACMessageCreator();
+                String message = messageCreator.createMessage(request);
+                try {
+                    String calculatedSignature = this.algorithm.encryptMessage(secretKey, message);
+                    if (signature.compareTo(calculatedSignature) != 0) {
                         response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
                             "Error: Invalid authentication token.");
                         return;
+                    } else {
+                        chain.doFilter(req, res);
+                        return;
                     }
-
-                    String accessKey = credentials.substring(0, index).trim();
-                    String signature = credentials.substring(index + 1).trim();
-
-                    String secretKey = getSecretKey(accessKey);
-
-                    HMACMessageCreator messageCreator = new HMACMessageCreator();
-                    String message = messageCreator.createMessage(request, this.customHeaders);
-                    try {
-                        String calculatedSignature = this.algorithm.encryptMessage(secretKey,
-                            message);
-
-                        if (signature.compareTo(calculatedSignature) != 0) {
-
-                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                                "Error: Invalid authentication token.");
-                            return;
-                        } else {
-                            chain.doFilter(req, res);
-                            return;
-                        }
-                    } catch(SignatureException e) {
-                        throw new IOException("Could not create calculated signature", e);
-                    }
+                } catch(SignatureException e) {
+                    throw new IOException("Could not create calculated signature", e);
                 }
             }
 
@@ -113,7 +75,6 @@ public abstract class HMACFilter implements Filter {
                 "Error: No authentication credentials were found.");
             return;
         }
-
     }
 
     @Override
