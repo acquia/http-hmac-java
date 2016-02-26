@@ -53,7 +53,7 @@ public abstract class HMACHttpServlet extends HttpServlet {
 
                 String secretKey = getSecretKey(accessKey);
 
-                HMACMessageCreator messageCreator = new HMACMessageCreator(authHeader);
+                HMACMessageCreator messageCreator = new HMACMessageCreator();
                 String message = messageCreator.createMessage(request);
                 try {
                     String calculatedSignature = this.algorithm.encryptMessage(secretKey, message);

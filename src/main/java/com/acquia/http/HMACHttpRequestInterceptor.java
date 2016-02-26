@@ -88,8 +88,8 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
     public void process(HttpRequest request, HttpContext context) throws HttpException, IOException {
         HMACAuthorizationHeader authHeader = this.createHMACAuthorizationHeader();
 
-        HMACMessageCreator messageCreator = new HMACMessageCreator(authHeader);
-        String message = messageCreator.createMessage(request);
+        HMACMessageCreator messageCreator = new HMACMessageCreator();
+        String message = messageCreator.createMessage(request, authHeader);
         String encryptedMessage = "";
         try {
             encryptedMessage = this.algorithm.encryptMessage(this.secretKey, message);

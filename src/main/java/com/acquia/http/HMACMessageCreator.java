@@ -8,6 +8,7 @@ import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,16 +35,11 @@ public class HMACMessageCreator {
     private static final String PARAMETER_X_AUTHORIZATION_TIMESTAMP = "X-Authorization-Timestamp";
     private static final String PARAMETER_CONTENT_TYPE = "Content-Type";
 
-    private HMACAuthorizationHeader authHeader;
-
     /**
      * Constructor
-     * 
-     * @param authHeader
      */
-    public HMACMessageCreator(HMACAuthorizationHeader authHeader) {
+    public HMACMessageCreator() {
         super();
-        this.authHeader = authHeader;
     }
 
     /**
@@ -64,15 +60,12 @@ public class HMACMessageCreator {
             queryParameters = "";
         }
 
-        //if authHeader is not set, try setting it from request
-        if (this.authHeader == null) {
-            String authorization = request.getHeader(PARAMETER_AUTHORIZATION);
-            this.authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
-        }
+        String authorization = request.getHeader(PARAMETER_AUTHORIZATION);
+        HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
 
-        Map<String, String> authorizationHeaderParameterMap = this.authHeader.getEssentialHeaderMap();
-        Map<String, String> authorizationCustomHeaderParameterMap = HMACUtil.getCustomHeaderMap(
-            this.authHeader, request);
+        Map<String, String> authorizationHeaderParameterMap = authHeader.getEssentialHeaderMap();
+        Map<String, String> authorizationCustomHeaderParameterMap = this.getCustomHeaderMap(
+            authHeader, request);
 
         String xAuthorizationTimestamp = request.getHeader(PARAMETER_X_AUTHORIZATION_TIMESTAMP);
         String contentType = request.getContentType();
@@ -84,13 +77,39 @@ public class HMACMessageCreator {
     }
 
     /**
+     * Create a key-value pair Map with custom headers of the Authorization
+     * The pairs are constructed by grabbing the value by its header name in request object
+     * 
+     * @param authHeader
+     * @param request
+     * @return
+     */
+    private Map<String, String> getCustomHeaderMap(HMACAuthorizationHeader authHeader,
+            HttpServletRequest request) {
+        Map<String, String> theMap = new HashMap<String, String>();
+        List<String> customHeaders = authHeader.getHeaders();
+        if (customHeaders != null && customHeaders.size() > 0) {
+            for (String headerName : customHeaders) {
+                String headerValue = request.getHeader(headerName);
+                if (headerValue == null) {
+                    continue; //FIXME: throw error? custom parameter cannot be found
+                }
+                theMap.put(headerName.toLowerCase(), headerValue);
+            }
+        }
+        return theMap;
+    }
+
+    /**
      * Create the message based on the given HTTP request to be sent and the list of custom header names.
      * 
-     * @param request HTTP request
+     * @param request; HTTP request
+     * @param authHeader; specify authHeader
      * @return The message to be encrypted
      * @throws IOException if bodyHash cannot be created
      */
-    protected String createMessage(HttpRequest request) throws IOException {
+    protected String createMessage(HttpRequest request, HMACAuthorizationHeader authHeader)
+            throws IOException {
         String httpVerb = request.getRequestLine().getMethod().toUpperCase();
 
         String host = "";
@@ -110,14 +129,14 @@ public class HMACMessageCreator {
         }
 
         //if authHeader is not set, try setting it from request
-        if (this.authHeader == null) {
+        if (authHeader == null) {
             String authorization = request.getFirstHeader(PARAMETER_AUTHORIZATION).getValue();
-            this.authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
+            authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
         }
 
-        Map<String, String> authorizationHeaderParameterMap = this.authHeader.getEssentialHeaderMap();
-        Map<String, String> authorizationCustomHeaderParameterMap = HMACUtil.getCustomHeaderMap(
-            this.authHeader, request);
+        Map<String, String> authorizationHeaderParameterMap = authHeader.getEssentialHeaderMap();
+        Map<String, String> authorizationCustomHeaderParameterMap = this.getCustomHeaderMap(
+            authHeader, request);
 
         String xAuthorizationTimestamp = request.getFirstHeader(PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue();
 
@@ -138,6 +157,30 @@ public class HMACMessageCreator {
         return this.createMessage(httpVerb, host, path, queryParameters,
             authorizationHeaderParameterMap, authorizationCustomHeaderParameterMap,
             xAuthorizationTimestamp, contentType, requestBody);
+    }
+
+    /**
+     * Create a key-value pair Map with custom headers of the Authorization
+     * The pairs are constructed by grabbing the value by its header name in request object
+     * 
+     * @param authHeader
+     * @param request
+     * @return
+     */
+    private Map<String, String> getCustomHeaderMap(HMACAuthorizationHeader authHeader,
+            HttpRequest request) {
+        Map<String, String> theMap = new HashMap<String, String>();
+        List<String> customHeaders = authHeader.getHeaders();
+        if (customHeaders != null && customHeaders.size() > 0) {
+            for (String headerName : customHeaders) {
+                Header customHeader = request.getFirstHeader(headerName);
+                if (customHeader == null) {
+                    continue; //FIXME: throw error? custom parameter cannot be found
+                }
+                theMap.put(headerName.toLowerCase(), customHeader.getValue());
+            }
+        }
+        return theMap;
     }
 
     /**
