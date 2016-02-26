@@ -63,7 +63,6 @@ public class HMACMessageCreator {
         String authorization = request.getHeader(PARAMETER_AUTHORIZATION);
         HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
 
-        Map<String, String> authorizationHeaderParameterMap = authHeader.getEssentialHeaderMap();
         Map<String, String> authorizationCustomHeaderParameterMap = this.getCustomHeaderMap(
             authHeader, request);
 
@@ -71,9 +70,9 @@ public class HMACMessageCreator {
         String contentType = request.getContentType();
         InputStream requestBody = request.getInputStream();
 
-        return this.createMessage(httpVerb, host, path, queryParameters,
-            authorizationHeaderParameterMap, authorizationCustomHeaderParameterMap,
-            xAuthorizationTimestamp, contentType, requestBody);
+        return this.createMessage(httpVerb, host, path, queryParameters, authHeader,
+            authorizationCustomHeaderParameterMap, xAuthorizationTimestamp, contentType,
+            requestBody);
     }
 
     /**
@@ -134,7 +133,6 @@ public class HMACMessageCreator {
             authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
         }
 
-        Map<String, String> authorizationHeaderParameterMap = authHeader.getEssentialHeaderMap();
         Map<String, String> authorizationCustomHeaderParameterMap = this.getCustomHeaderMap(
             authHeader, request);
 
@@ -154,9 +152,9 @@ public class HMACMessageCreator {
             requestBody = entity.getContent();
         }
 
-        return this.createMessage(httpVerb, host, path, queryParameters,
-            authorizationHeaderParameterMap, authorizationCustomHeaderParameterMap,
-            xAuthorizationTimestamp, contentType, requestBody);
+        return this.createMessage(httpVerb, host, path, queryParameters, authHeader,
+            authorizationCustomHeaderParameterMap, xAuthorizationTimestamp, contentType,
+            requestBody);
     }
 
     /**
@@ -190,7 +188,7 @@ public class HMACMessageCreator {
      * @param host; HTTP "Host" request header field (including any port number)
      * @param path; HTTP request path with leading slash '/'
      * @param queryParameters; exact string sent by the client, including urlencoding, without leading question mark '?'
-     * @param authorizationHeaderParameterMap; Map (key, value) of Authorization header for: "realm", "id", "nonce", "version"
+     * @param authHeader; Authorization header that contains essential header information
      * @param authorizationCustomHeaderParameterMap; Map (key, value) of Authorization header for: "headers" - other custom signed headers
      * @param xAuthorizationTimestamp; value of X-Authorization-Timestamp header
      * @param contentType; value of Content-Type header
@@ -199,7 +197,7 @@ public class HMACMessageCreator {
      * @throws IOException if bodyHash cannot be created
      */
     private String createMessage(String httpVerb, String host, String path, String queryParameters,
-            Map<String, String> authorizationHeaderParameterMap,
+            HMACAuthorizationHeader authHeader,
             Map<String, String> authorizationCustomHeaderParameterMap,
             String xAuthorizationTimestamp, String contentType, InputStream requestBody)
             throws IOException {
@@ -214,6 +212,7 @@ public class HMACMessageCreator {
         result.append(queryParameters).append("\n");
 
         //adding Authorization header parameters
+        /*
         List<String> sortedKeyList = new ArrayList<String>(authorizationHeaderParameterMap.keySet());
         Collections.sort(sortedKeyList);
         boolean isFirst = true;
@@ -226,6 +225,12 @@ public class HMACMessageCreator {
                     "+", "%20"));
             isFirst = false;
         }
+        */
+        result.append("id=").append(authHeader.getId());
+        result.append("&nonce=").append(authHeader.getNonce());
+        result.append("&realm=").append(
+            URLEncoder.encode(authHeader.getRealm(), ENCODING_UTF_8).replace("+", "%20"));
+        result.append("&version=").append(authHeader.getVersion());
         result.append("\n");
 
         //adding Authorization custom header parameters

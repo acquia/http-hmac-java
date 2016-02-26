@@ -284,18 +284,4 @@ public class HMACAuthorizationHeader {
         return sBuilder.toString();
     }
 
-    /**
-     * Create a key-value pair Map with essential headers of the Authorization
-     * 
-     * @return
-     */
-    public Map<String, String> getEssentialHeaderMap() {
-        Map<String, String> theMap = new HashMap<String, String>();
-        theMap.put("realm", this.realm);
-        theMap.put("id", this.id);
-        theMap.put("nonce", this.nonce);
-        theMap.put("version", this.version);
-        return theMap;
-    }
-
 }
