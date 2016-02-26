@@ -18,95 +18,39 @@ import org.apache.http.HttpRequest;
 public class HMACUtil {
 
     /**
-     * Construct Authorization content
-     * 
-     * @param realm
-     * @param id
-     * @param nonce
-     * @param version
-     * @param headers; optional: omitted if null
-     * @param signature; optional: omitted if null
+     * Helper method to implode a list of Strings into a String
+     * For example: List [ "a", "b" ] delimiter "," will become "a,b"
+     * @param theList
+     * @param glue
      * @return
      */
-    public static StringBuilder constructAuthorizationString(String realm, String id, String nonce,
-            String version, String headers, String signature) {
-        StringBuilder authBuilder = new StringBuilder();
-        authBuilder.append("acquia-http-hmac realm=\"").append(realm).append("\",");
-        authBuilder.append("id=\"").append(id).append("\",");
-        authBuilder.append("nonce=\"").append(nonce).append("\",");
-        authBuilder.append("version=\"").append(version).append("\"");
-
-        if (headers != null && headers.length() > 0) {
-            authBuilder.append(",headers=\"").append(headers).append("\"");
-        }
-
-        if (signature != null && signature.length() > 0) {
-            authBuilder.append(",signature=\"").append(signature).append("\"");
-        }
-
-        return authBuilder;
-    }
-
-    /**
-     * This method converts an Authorization string into a key-value pair Map
-     * 
-     * The input format:
-     * acquia-http-hmac realm="Example",id="client-id",nonce="random-uuid",version="2.0",headers="custom1;custom2",signature="Signature"
-     * 
-     * The result of this call will be a Map in <key,value> pair of the parameters section (2nd token)
-     * This will discard the 1st token (i.e.: acquia-http-hmac will be discarded)
-     * 
-     * @param authString; in the format specified above
-     * @return
-     */
-    public static Map<String, String> convertAuthorizationIntoParameterMap(String authString) {
-        int indexSpace = authString.indexOf(" ");
-        String authContent = authString.substring(indexSpace + 1);
-        String[] authParams = authContent.split(",");
-
-        Map<String, String> theMap = new HashMap<String, String>();
-        for (String param : authParams) {
-            int indexDelimiter = param.indexOf("="); //first index of delimiter
-            String key = param.substring(0, indexDelimiter);
-            String val = param.substring(indexDelimiter + 1);
-            theMap.put(key.toLowerCase(), val.substring(1, val.length() - 1)); //remove "" from val
-        }
-        return theMap;
-    }
-
-    /**
-     * This method filters and picks up all key-pair values as specified from a list of baseHeaderNames
-     * 
-     * @param authorizationParameterMap
-     * @param baseHeaderNames
-     * @return
-     */
-    public static Map<String, String> buildBaseHeaderMap(
-            Map<String, String> authorizationParameterMap, List<String> baseHeaderNames) {
-        Map<String, String> theMap = new HashMap<String, String>();
-        for (String headerName : baseHeaderNames) {
-            String headerValue = authorizationParameterMap.get(headerName);
-            if (headerValue == null) {
-                continue; //FIXME: throw error? base parameters are all required
+    public static String implodeStringArray(List<String> theList, String glue) {
+        StringBuilder sBuilder = new StringBuilder();
+        boolean isFirst = true;
+        for (String aString : theList) {
+            if (!isFirst) {
+                sBuilder.append(glue);
             }
-            theMap.put(headerName.toLowerCase(), headerValue);
+            sBuilder.append(aString);
+            isFirst = false;
         }
-        return theMap;
+        return sBuilder.toString();
     }
 
     /**
-     * This method builds Custom Header Map
-     * Key-Value pairs are constructed by grabbing the value by its header name in request object
+     * Create a key-value pair Map with custom headers of the Authorization
+     * The pairs are constructed by grabbing the value by its header name in request object
      * 
+     * @param authHeader
      * @param request
-     * @param customHeaders; headers are separated by ";"
      * @return
      */
-    public static Map<String, String> buildCustomHeaderMap(HttpServletRequest request,
-            String customHeaders) {
+    public static Map<String, String> getCustomHeaderMap(HMACAuthorizationHeader authHeader,
+            HttpServletRequest request) {
         Map<String, String> theMap = new HashMap<String, String>();
-        if (customHeaders != null && customHeaders.length() > 0) {
-            for (String headerName : customHeaders.split(";")) {
+        List<String> customHeaders = authHeader.getHeaders();
+        if (customHeaders != null && customHeaders.size() > 0) {
+            for (String headerName : customHeaders) {
                 String headerValue = request.getHeader(headerName);
                 if (headerValue == null) {
                     continue; //FIXME: throw error? custom parameter cannot be found
@@ -118,17 +62,19 @@ public class HMACUtil {
     }
 
     /**
-     * This method builds Custom Header Map
-     * Key-Value pairs are constructed by grabbing the value by its header name in request object
+     * Create a key-value pair Map with custom headers of the Authorization
+     * The pairs are constructed by grabbing the value by its header name in request object
      * 
+     * @param authHeader
      * @param request
-     * @param customHeaders; headers are separated by ";"
      * @return
      */
-    public static Map<String, String> buildCustomHeaderMap(HttpRequest request, String customHeaders) {
+    public static Map<String, String> getCustomHeaderMap(HMACAuthorizationHeader authHeader,
+            HttpRequest request) {
         Map<String, String> theMap = new HashMap<String, String>();
-        if (customHeaders != null && customHeaders.length() > 0) {
-            for (String headerName : customHeaders.split(";")) {
+        List<String> customHeaders = authHeader.getHeaders();
+        if (customHeaders != null && customHeaders.size() > 0) {
+            for (String headerName : customHeaders) {
                 Header customHeader = request.getFirstHeader(headerName);
                 if (customHeader == null) {
                     continue; //FIXME: throw error? custom parameter cannot be found

@@ -2,7 +2,6 @@ package com.acquia.http;
 
 import java.io.IOException;
 import java.security.SignatureException;
-import java.util.Map;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -45,16 +44,16 @@ public abstract class HMACFilter implements Filter {
             HttpServletRequest request = (HttpServletRequest) req;
             HttpServletResponse response = (HttpServletResponse) res;
 
-            String authHeader = request.getHeader("Authorization");
-            if (authHeader != null) {
-                Map<String, String> authorizationParameterMap = HMACUtil.convertAuthorizationIntoParameterMap(authHeader);
+            String authorization = request.getHeader("Authorization");
+            if (authorization != null) {
+                HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
 
-                String accessKey = authorizationParameterMap.get("id");
-                String signature = authorizationParameterMap.get("signature");
+                String accessKey = authHeader.getId();
+                String signature = authHeader.getSignature();
 
                 String secretKey = getSecretKey(accessKey);
 
-                HMACMessageCreator messageCreator = new HMACMessageCreator();
+                HMACMessageCreator messageCreator = new HMACMessageCreator(authHeader);
                 String message = messageCreator.createMessage(request);
                 try {
                     String calculatedSignature = this.algorithm.encryptMessage(secretKey, message);

@@ -21,6 +21,9 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class HMACFilterTest {
+    
+    private final String id = "f0d16792-cdc9-4585-a5fd-bae3d898d8c5";
+    private final String secretKey = "eox4TsBBPhpi737yMxpdBbr3sgg/DEC4m47VXO0B8qJLsbdMsmN47j/ZF/EFpyUKtAhm0OWXMGaAjRaho7/93Q==";
 
     private HttpServletRequest request;
     private HttpServletResponse response;
@@ -30,7 +33,7 @@ public class HMACFilterTest {
     public void setup() throws IOException, ServletException {
         //base Authorization parameter
         String realm = "Plexus";
-        String accessKey = "f0d16792-cdc9-4585-a5fd-bae3d898d8c5";
+        
         String nonce = "64d02132-40bf-4fce-85bf-3f1bb1bfe7dd";
         String version = "2.0";
         String xAuthorizationTimestamp = "1449578521";
@@ -44,7 +47,7 @@ public class HMACFilterTest {
 
         String signature = "4VtBHjqrdDeYrJySoJVDUHpN9u3vyTsyOLz4chezi98=";
 
-        StringBuilder authBuilder = HMACUtil.constructAuthorizationString(realm, accessKey, nonce,
+        HMACAuthorizationHeader authHeader = new HMACAuthorizationHeader(realm, id, nonce,
             version, /*headers*/null, signature);
 
         final ByteArrayInputStream realInputStream = new ByteArrayInputStream(reqBody.getBytes());
@@ -56,7 +59,7 @@ public class HMACFilterTest {
         };
 
         this.request = mock(HttpServletRequest.class);
-        when(this.request.getHeader("Authorization")).thenReturn(authBuilder.toString());
+        when(this.request.getHeader("Authorization")).thenReturn(authHeader.toString());
         when(this.request.getHeader("X-Authorization-Timestamp")).thenReturn(
             xAuthorizationTimestamp);
         when(this.request.getMethod()).thenReturn(httpMethod);
@@ -75,8 +78,8 @@ public class HMACFilterTest {
         HMACFilter testFilter = new HMACFilter() {
             @Override
             protected String getSecretKey(String accessKey) {
-                if ("f0d16792-cdc9-4585-a5fd-bae3d898d8c5".equals(accessKey)) {
-                    return "eox4TsBBPhpi737yMxpdBbr3sgg/DEC4m47VXO0B8qJLsbdMsmN47j/ZF/EFpyUKtAhm0OWXMGaAjRaho7/93Q==";
+                if (id.equals(accessKey)) {
+                    return secretKey;
                 }
                 return null;
             }
@@ -94,7 +97,7 @@ public class HMACFilterTest {
         HMACFilter testFilter = new HMACFilter() {
             @Override
             protected String getSecretKey(String accessKey) {
-                if ("f0d16792-cdc9-4585-a5fd-bae3d898d8c5".equals(accessKey)) {
+                if (id.equals(accessKey)) {
                     return "other-key";
                 }
                 return null;

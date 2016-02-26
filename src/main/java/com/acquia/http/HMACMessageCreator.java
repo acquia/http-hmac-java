@@ -7,7 +7,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -35,8 +34,17 @@ public class HMACMessageCreator {
     private static final String PARAMETER_X_AUTHORIZATION_TIMESTAMP = "X-Authorization-Timestamp";
     private static final String PARAMETER_CONTENT_TYPE = "Content-Type";
 
-    private final List<String> baseHeaderNames = Arrays.asList("id", "nonce", "realm", "version");
-    private final String customHeaderName = "headers";
+    private HMACAuthorizationHeader authHeader;
+
+    /**
+     * Constructor
+     * 
+     * @param authHeader
+     */
+    public HMACMessageCreator(HMACAuthorizationHeader authHeader) {
+        super();
+        this.authHeader = authHeader;
+    }
 
     /**
      * Create the message based on the given HTTP request received and list of custom headers.
@@ -56,13 +64,15 @@ public class HMACMessageCreator {
             queryParameters = "";
         }
 
-        String authorization = request.getHeader(PARAMETER_AUTHORIZATION);
-        Map<String, String> authorizationParameterMap = HMACUtil.convertAuthorizationIntoParameterMap(authorization);
+        //if authHeader is not set, try setting it from request
+        if (this.authHeader == null) {
+            String authorization = request.getHeader(PARAMETER_AUTHORIZATION);
+            this.authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
+        }
 
-        Map<String, String> authorizationHeaderParameterMap = HMACUtil.buildBaseHeaderMap(
-            authorizationParameterMap, this.baseHeaderNames);
-        Map<String, String> authorizationCustomHeaderParameterMap = HMACUtil.buildCustomHeaderMap(
-            request, authorizationParameterMap.get(this.customHeaderName));
+        Map<String, String> authorizationHeaderParameterMap = this.authHeader.getEssentialHeaderMap();
+        Map<String, String> authorizationCustomHeaderParameterMap = HMACUtil.getCustomHeaderMap(
+            this.authHeader, request);
 
         String xAuthorizationTimestamp = request.getHeader(PARAMETER_X_AUTHORIZATION_TIMESTAMP);
         String contentType = request.getContentType();
@@ -99,13 +109,15 @@ public class HMACMessageCreator {
             throw new IOException("Invalid URI", e);
         }
 
-        String authorization = request.getFirstHeader(PARAMETER_AUTHORIZATION).getValue();
-        Map<String, String> authorizationParameterMap = HMACUtil.convertAuthorizationIntoParameterMap(authorization);
+        //if authHeader is not set, try setting it from request
+        if (this.authHeader == null) {
+            String authorization = request.getFirstHeader(PARAMETER_AUTHORIZATION).getValue();
+            this.authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
+        }
 
-        Map<String, String> authorizationHeaderParameterMap = HMACUtil.buildBaseHeaderMap(
-            authorizationParameterMap, this.baseHeaderNames);
-        Map<String, String> authorizationCustomHeaderParameterMap = HMACUtil.buildCustomHeaderMap(
-            request, authorizationParameterMap.get(this.customHeaderName));
+        Map<String, String> authorizationHeaderParameterMap = this.authHeader.getEssentialHeaderMap();
+        Map<String, String> authorizationCustomHeaderParameterMap = HMACUtil.getCustomHeaderMap(
+            this.authHeader, request);
 
         String xAuthorizationTimestamp = request.getFirstHeader(PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue();
 
@@ -195,7 +207,6 @@ public class HMACMessageCreator {
             String bodyHash = Base64.encodeBase64String(encBody); //v2 specification requires base64 encoded SHA-256
             result.append("\n").append(bodyHash);
         }
-        //        System.out.println("Message to be encrypted:\n" + result);
         return result.toString();
     }
 

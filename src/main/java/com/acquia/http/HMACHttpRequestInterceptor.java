@@ -84,46 +84,31 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         return this.customHeaders.toArray(new String[this.customHeaders.size()]);
     }
 
-    /**
-     * Helper method to implode a list of Strings into a String
-     * For example: List [ "a", "b" ] delimiter "," will become "a,b"
-     * @param theList
-     * @param glue
-     * @return
-     */
-    private String implodeStringArray(List<String> theList, String glue) {
-        StringBuilder sBuilder = new StringBuilder();
-        boolean isFirst = true;
-        for (String aString : theList) {
-            if (!isFirst) {
-                sBuilder.append(glue);
-            }
-            sBuilder.append(aString);
-            isFirst = false;
-        }
-        return sBuilder.toString();
-    }
-
     @Override
     public void process(HttpRequest request, HttpContext context) throws HttpException, IOException {
-        StringBuilder authBuilder = HMACUtil.constructAuthorizationString(this.realm,
-            this.accessKey, UUID.randomUUID().toString(), VERSION,
-            this.implodeStringArray(this.customHeaders, ";"), /*signature*/null);
-        request.addHeader("Authorization", authBuilder.toString()); //the info provided so far will need to be encrypted
+        HMACAuthorizationHeader authHeader = this.createHMACAuthorizationHeader();
 
-        HMACMessageCreator messageCreator = new HMACMessageCreator();
+        HMACMessageCreator messageCreator = new HMACMessageCreator(authHeader);
         String message = messageCreator.createMessage(request);
-        //        System.out.println("Message:\n" + message);
         String encryptedMessage = "";
         try {
             encryptedMessage = this.algorithm.encryptMessage(this.secretKey, message);
         } catch(SignatureException e) {
             throw new IOException("Could not encrypt message", e);
         }
-        //        System.out.println("Encrypted message:\n" + encryptedMessage);
 
-        authBuilder.append(",signature=\"").append(encryptedMessage).append("\"");
-        request.setHeader("Authorization", authBuilder.toString()); //set it again, this time with encrypted signature
+        authHeader.setSignature(encryptedMessage);
+        request.setHeader("Authorization", authHeader.toString()); //set it with encrypted signature
+    }
+
+    /**
+     * Helper method to create createHMACAuthorizationHeader
+     * 
+     * @return
+     */
+    protected HMACAuthorizationHeader createHMACAuthorizationHeader() {
+        return new HMACAuthorizationHeader(this.realm, this.accessKey,
+            UUID.randomUUID().toString(), VERSION, this.customHeaders, /*signature*/null);
     }
 
 }
