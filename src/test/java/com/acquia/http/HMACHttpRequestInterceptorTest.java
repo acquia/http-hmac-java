@@ -32,7 +32,8 @@ public class HMACHttpRequestInterceptorTest {
         String xAuthorizationTimestamp = "1432075982";
 
         String httpMethod = "GET";
-        String uri = "https://example.acquiapipet.net/v1.0/task-status/133?limit=10";
+        String hostPort = "example.acquiapipet.net";
+        String uri = "/v1.0/task-status/133?limit=10";
         String secretKey = "W5PeGMxSItNerkNFqQMfYiJvH14WzVJMy54CPoTAYoI=";
 
         final HMACAuthorizationHeader authHeader = new HMACAuthorizationHeader(realm, id, nonce,
@@ -59,6 +60,8 @@ public class HMACHttpRequestInterceptorTest {
         HttpEntity requestEntity = mock(HttpEntity.class);
         when(request.getEntity()).thenReturn(requestEntity);
 
+        Header hostPortHeader = mockHeader(hostPort);
+        when(request.getFirstHeader("Host")).thenReturn(hostPortHeader);
         Header xAuthorizationTimestampHeader = mockHeader(xAuthorizationTimestamp);
         when(request.getFirstHeader("X-Authorization-Timestamp")).thenReturn(
             xAuthorizationTimestampHeader);
@@ -95,7 +98,8 @@ public class HMACHttpRequestInterceptorTest {
         String xAuthorizationTimestamp = "1449578521";
 
         String httpMethod = "POST";
-        String uri = "http://54.154.147.142:3000/register";
+        String hostPort = "54.154.147.142:3000";
+        String uri = "/register";
         String secretKey = "eox4TsBBPhpi737yMxpdBbr3sgg/DEC4m47VXO0B8qJLsbdMsmN47j/ZF/EFpyUKtAhm0OWXMGaAjRaho7/93Q==";
 
         String contentType = "application/json";
@@ -133,6 +137,8 @@ public class HMACHttpRequestInterceptorTest {
         when(requestEntity.getContent()).thenReturn(requestInputStream);
         when(request.getEntity()).thenReturn(requestEntity);
 
+        Header hostPortHeader = mockHeader(hostPort);
+        when(request.getFirstHeader("Host")).thenReturn(hostPortHeader);
         Header contentTypeHeader = mockHeader(contentType);
         when(request.getFirstHeader("Content-Type")).thenReturn(contentTypeHeader);
         Header xAuthorizationTimestampHeader = mockHeader(xAuthorizationTimestamp);

@@ -35,6 +35,8 @@ public class HMACMessageCreator {
     private static final String PARAMETER_X_AUTHORIZATION_TIMESTAMP = "X-Authorization-Timestamp";
     private static final String PARAMETER_CONTENT_TYPE = "Content-Type";
 
+    private static final String PARAMETER_HOST = "Host";
+
     /**
      * Constructor
      */
@@ -111,13 +113,11 @@ public class HMACMessageCreator {
             throws IOException {
         String httpVerb = request.getRequestLine().getMethod().toUpperCase();
 
-        String host = "";
+        String host = request.getFirstHeader(PARAMETER_HOST).getValue();
         String path = "";
         String queryParameters = "";
         try {
             URI uri = new URI(request.getRequestLine().getUri());
-            int port = uri.getPort();
-            host = uri.getHost() + (port > 0 ? ":" + port : "");
             path = uri.getPath();
             queryParameters = uri.getQuery();
             if (queryParameters == null) {
@@ -208,24 +208,9 @@ public class HMACMessageCreator {
         result.append(httpVerb.toUpperCase()).append("\n");
         result.append(host.toLowerCase()).append("\n");
         result.append(path).append("\n");
-        //        result.append(URLEncoder.encode(queryParameters, ENCODING_UTF_8).replace("+", "%20")).append("\n");
         result.append(queryParameters).append("\n");
 
         //adding Authorization header parameters
-        /*
-        List<String> sortedKeyList = new ArrayList<String>(authorizationHeaderParameterMap.keySet());
-        Collections.sort(sortedKeyList);
-        boolean isFirst = true;
-        for (String headerKey : sortedKeyList) {
-            if (!isFirst) {
-                result.append("&");
-            }
-            result.append(headerKey.toLowerCase()).append("=").append(
-                URLEncoder.encode(authorizationHeaderParameterMap.get(headerKey), ENCODING_UTF_8).replace(
-                    "+", "%20"));
-            isFirst = false;
-        }
-        */
         result.append("id=").append(authHeader.getId());
         result.append("&nonce=").append(authHeader.getNonce());
         result.append("&realm=").append(
