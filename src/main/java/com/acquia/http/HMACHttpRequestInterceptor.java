@@ -5,6 +5,7 @@ import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
@@ -19,10 +20,12 @@ import org.apache.http.protocol.HttpContext;
  */
 public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
 
+    private static final String VERSION = "2.0";
+
     /**
      * The Authorization provider
      */
-    protected String provider;
+    protected String realm;
     /**
      * The access key
      */
@@ -31,28 +34,29 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
      * The secret key
      */
     protected String secretKey;
-    
+
     /**
      * The list of custom header names to use when creating the message to be encrypted
      */
     protected List<String> customHeaders;
-    
+
     /**
      * The algorithm to use when creating the HMAC
      */
     protected HMACAlgorithm algorithm;
-    
+
     /**
      * Create an HMACHttpRequestInterceptor with the given provider, access key and secret key. Use
      * the algorithm with the given name to create the HMAC.
      * 
-     * @param provider Authorization provider
+     * @param realm Authorization provider
      * @param accessKey Access Key
      * @param secretKey Secret Key
      * @param algorithmName Name of Algorithm
      */
-    public HMACHttpRequestInterceptor( String provider, String accessKey, String secretKey, String algorithmName) {
-        this.provider = provider;
+    public HMACHttpRequestInterceptor(String realm, String accessKey, String secretKey,
+            String algorithmName) {
+        this.realm = realm;
         this.accessKey = accessKey;
         this.secretKey = secretKey;
 
@@ -61,43 +65,50 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
 
         this.customHeaders = new ArrayList<String>();
     }
-    
+
     /**
      * Sets the custom HTTP header names to use when constructing the message.
      * 
      * @param customHeaders The list of HTTP header names
      */
-    public void setCustomHeaders( String[] customHeaders ) {
-        this.customHeaders = new ArrayList<String>( Arrays.asList( customHeaders ) ) ;
+    public void setCustomHeaders(String[] customHeaders) {
+        this.customHeaders = new ArrayList<String>(Arrays.asList(customHeaders));
     }
-    
+
     /** 
      * Returns the custom header names to use when constructing the message.
      * 
      * @return The list of HTTP header names
      */
     public String[] getCustomHeaders() {
-        return this.customHeaders.toArray(new String[ this.customHeaders.size() ]);
+        return this.customHeaders.toArray(new String[this.customHeaders.size()]);
     }
-    
+
     @Override
     public void process(HttpRequest request, HttpContext context) throws HttpException, IOException {
+        HMACAuthorizationHeader authHeader = this.createHMACAuthorizationHeader();
+
         HMACMessageCreator messageCreator = new HMACMessageCreator();
-        String message = messageCreator.createMessage( request, this.customHeaders );
+        String message = messageCreator.createMessage(request, authHeader);
+        String encryptedMessage = "";
         try {
-            String encryptedMessage = this.algorithm.encryptMessage( this.secretKey, message);
-            StringBuilder authHeader = new StringBuilder( this.provider );
-            authHeader.append(" ");
-            authHeader.append(this.accessKey);
-            authHeader.append(":");
-            authHeader.append(encryptedMessage);
-            request.addHeader("Authorization", authHeader.toString());
-        }
-        catch ( SignatureException e ) {
+            encryptedMessage = this.algorithm.encryptMessage(this.secretKey, message);
+        } catch(SignatureException e) {
             throw new IOException("Could not encrypt message", e);
         }
+
+        authHeader.setSignature(encryptedMessage);
+        request.setHeader("Authorization", authHeader.toString()); //set it with encrypted signature
     }
 
-
+    /**
+     * Helper method to create createHMACAuthorizationHeader
+     * 
+     * @return
+     */
+    protected HMACAuthorizationHeader createHMACAuthorizationHeader() {
+        return new HMACAuthorizationHeader(this.realm, this.accessKey,
+            UUID.randomUUID().toString(), VERSION, this.customHeaders, /*signature*/null);
+    }
 
 }
