@@ -36,6 +36,8 @@ public class HMACHttpRequestInterceptorTest {
         String uri = "/v1.0/task-status/133?limit=10";
         String secretKey = "W5PeGMxSItNerkNFqQMfYiJvH14WzVJMy54CPoTAYoI=";
 
+        String expectedSignature = "MRlPr/Z1WQY2sMthcaEqETRMw4gPYXlPcTpaLWS2gcc=";
+
         final HMACAuthorizationHeader authHeader = new HMACAuthorizationHeader(realm, id, nonce,
             version);
 
@@ -84,8 +86,7 @@ public class HMACHttpRequestInterceptorTest {
         authorizationInterceptor.process(request, context);
 
         HMACAuthorizationHeader calculatedAuthHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(calcAuthorizationHeader.toString());
-        Assert.assertEquals("MRlPr/Z1WQY2sMthcaEqETRMw4gPYXlPcTpaLWS2gcc=",
-            calculatedAuthHeader.getSignature());
+        Assert.assertEquals(expectedSignature, calculatedAuthHeader.getSignature());
     }
 
     @Test
@@ -103,7 +104,10 @@ public class HMACHttpRequestInterceptorTest {
         String secretKey = "eox4TsBBPhpi737yMxpdBbr3sgg/DEC4m47VXO0B8qJLsbdMsmN47j/ZF/EFpyUKtAhm0OWXMGaAjRaho7/93Q==";
 
         String contentType = "application/json";
+        String xAuthorizationContentSha256 = "6paRNxUA7WawFxJpRp4cEixDjHq3jfIKX072k9slalo=";
         String reqBody = "{\"method\":\"hi.bob\",\"params\":[\"5\",\"4\",\"8\"]}";
+
+        String expectedSignature = "4VtBHjqrdDeYrJySoJVDUHpN9u3vyTsyOLz4chezi98=";
 
         final HMACAuthorizationHeader authHeader = new HMACAuthorizationHeader(realm, id, nonce,
             version);
@@ -139,8 +143,13 @@ public class HMACHttpRequestInterceptorTest {
 
         Header hostPortHeader = mockHeader(hostPort);
         when(request.getFirstHeader("Host")).thenReturn(hostPortHeader);
+        Header contentLengthHeader = mockHeader(Integer.toString(reqBody.getBytes("UTF-8").length));
+        when(request.getFirstHeader("Content-Length")).thenReturn(contentLengthHeader);
         Header contentTypeHeader = mockHeader(contentType);
         when(request.getFirstHeader("Content-Type")).thenReturn(contentTypeHeader);
+        Header xAuthorizationContentSha256Header = mockHeader(xAuthorizationContentSha256);
+        when(request.getFirstHeader("X-Authorization-Content-SHA256")).thenReturn(
+            xAuthorizationContentSha256Header);
         Header xAuthorizationTimestampHeader = mockHeader(xAuthorizationTimestamp);
         when(request.getFirstHeader("X-Authorization-Timestamp")).thenReturn(
             xAuthorizationTimestampHeader);
@@ -162,8 +171,7 @@ public class HMACHttpRequestInterceptorTest {
         authorizationInterceptor.process(request, context);
 
         HMACAuthorizationHeader calculatedAuthHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(calcAuthorizationHeader.toString());
-        Assert.assertEquals("4VtBHjqrdDeYrJySoJVDUHpN9u3vyTsyOLz4chezi98=",
-            calculatedAuthHeader.getSignature());
+        Assert.assertEquals(expectedSignature, calculatedAuthHeader.getSignature());
     }
 
     private Header mockHeader(String value) {

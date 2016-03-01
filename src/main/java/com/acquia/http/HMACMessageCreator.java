@@ -33,6 +33,8 @@ public class HMACMessageCreator {
 
     private static final String PARAMETER_AUTHORIZATION = "Authorization";
     private static final String PARAMETER_X_AUTHORIZATION_TIMESTAMP = "X-Authorization-Timestamp";
+    private static final String PARAMETER_X_AUTHORIZATION_CONTENT_SHA256 = "X-Authorization-Content-SHA256";
+    private static final String PARAMETER_CONTENT_LENGTH = "Content-Length";
     private static final String PARAMETER_CONTENT_TYPE = "Content-Type";
 
     private static final String PARAMETER_HOST = "Host";
@@ -69,12 +71,14 @@ public class HMACMessageCreator {
             authHeader, request);
 
         String xAuthorizationTimestamp = request.getHeader(PARAMETER_X_AUTHORIZATION_TIMESTAMP);
+        int contentLength = request.getContentLength();
         String contentType = request.getContentType();
+        String xAuthorizationContentSha256 = request.getHeader(PARAMETER_X_AUTHORIZATION_CONTENT_SHA256);
         InputStream requestBody = request.getInputStream();
 
         return this.createMessage(httpVerb, host, path, queryParameters, authHeader,
-            authorizationCustomHeaderParameterMap, xAuthorizationTimestamp, contentType,
-            requestBody);
+            authorizationCustomHeaderParameterMap, xAuthorizationTimestamp, contentLength,
+            contentType, xAuthorizationContentSha256, requestBody);
     }
 
     /**
@@ -138,6 +142,13 @@ public class HMACMessageCreator {
 
         String xAuthorizationTimestamp = request.getFirstHeader(PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue();
 
+        //optional content length
+        Header contentLengthHeader = request.getFirstHeader(PARAMETER_CONTENT_LENGTH);
+        int contentLength = 0;
+        if (contentLengthHeader != null) {
+            contentLength = Integer.parseInt(contentLengthHeader.getValue());
+        }
+
         //optional content type
         Header contentTypeHeader = request.getFirstHeader(PARAMETER_CONTENT_TYPE);
         String contentType = "";
@@ -145,16 +156,25 @@ public class HMACMessageCreator {
             contentType = contentTypeHeader.getValue();
         }
 
+        //optional authorization content sha256
+        Header xAuthorizationContentSha256Header = request.getFirstHeader(PARAMETER_X_AUTHORIZATION_CONTENT_SHA256);
+        String xAuthorizationContentSha256 = "";
+        if (xAuthorizationContentSha256Header != null) {
+            xAuthorizationContentSha256 = xAuthorizationContentSha256Header.getValue();
+        }
+
         //optional request body
         InputStream requestBody = null;
         if (request instanceof HttpEntityEnclosingRequest) {
             HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
-            requestBody = entity.getContent();
+            if (entity != null) {
+                requestBody = entity.getContent();
+            }
         }
 
         return this.createMessage(httpVerb, host, path, queryParameters, authHeader,
-            authorizationCustomHeaderParameterMap, xAuthorizationTimestamp, contentType,
-            requestBody);
+            authorizationCustomHeaderParameterMap, xAuthorizationTimestamp, contentLength,
+            contentType, xAuthorizationContentSha256, requestBody);
     }
 
     /**
@@ -191,7 +211,9 @@ public class HMACMessageCreator {
      * @param authHeader; Authorization header that contains essential header information
      * @param authorizationCustomHeaderParameterMap; Map (key, value) of Authorization header for: "headers" - other custom signed headers
      * @param xAuthorizationTimestamp; value of X-Authorization-Timestamp header
+     * @param contentLength; length of request body
      * @param contentType; value of Content-Type header
+     * @param xAuthorizationContentSha256; encrypted body hash for request body
      * @param requestBody; request body
      * @return The message to be encrypted
      * @throws IOException if bodyHash cannot be created
@@ -199,8 +221,8 @@ public class HMACMessageCreator {
     private String createMessage(String httpVerb, String host, String path, String queryParameters,
             HMACAuthorizationHeader authHeader,
             Map<String, String> authorizationCustomHeaderParameterMap,
-            String xAuthorizationTimestamp, String contentType, InputStream requestBody)
-            throws IOException {
+            String xAuthorizationTimestamp, int contentLength, String contentType,
+            String xAuthorizationContentSha256, InputStream requestBody) throws IOException {
 
         StringBuilder result = new StringBuilder();
 
@@ -231,16 +253,33 @@ public class HMACMessageCreator {
         result.append(xAuthorizationTimestamp);
 
         //adding more if needed
-        byte[] requestBodyBytes = this.convertInputStreamIntoBtyeArray(requestBody);
-        if (this.isPassingRequestBody(httpVerb, requestBodyBytes)) {
+        if (this.isPassingRequestBody(contentLength, xAuthorizationContentSha256, requestBody)) {
             result.append("\n").append(contentType.toLowerCase());
-
-            //calculate body hash
-            byte[] encBody = DigestUtils.sha256(requestBodyBytes);
-            String bodyHash = Base64.encodeBase64String(encBody); //v2 specification requires base64 encoded SHA-256
-            result.append("\n").append(bodyHash);
+            result.append("\n").append(xAuthorizationContentSha256);
         }
         return result.toString();
+    }
+
+    /**
+     * Method to help check if requestBody needs to be passed or can be omitted
+     * 
+     * @param xAuthorizationContentSha256
+     * @param contentLength
+     * @return
+     * @throws IOException 
+     */
+    private boolean isPassingRequestBody(int contentLength, String xAuthorizationContentSha256,
+            InputStream requestBody) throws IOException {
+        if (contentLength <= 0 || xAuthorizationContentSha256 == null
+                || xAuthorizationContentSha256.length() <= 0 || requestBody == null) {
+            return false;
+        }
+
+        //calculate and check body hash
+        byte[] requestBodyBytes = this.convertInputStreamIntoBtyeArray(requestBody);
+        byte[] encBody = DigestUtils.sha256(requestBodyBytes);
+        String bodyHash = Base64.encodeBase64String(encBody); //v2 specification requires base64 encoded SHA-256
+        return bodyHash.equals(xAuthorizationContentSha256);
     }
 
     /**
@@ -265,20 +304,5 @@ public class HMACMessageCreator {
         byteOutputStream.flush();
         byteOutputStream.close();
         return byteOutputStream.toByteArray();
-    }
-
-    /**
-     * Method to help check if requestBody needs to be passed or can be omitted
-     * 
-     * @param httpVerb
-     * @param requestBodyBytes
-     * @return
-     */
-    private boolean isPassingRequestBody(String httpVerb, byte[] requestBodyBytes) {
-        if (httpVerb.toUpperCase().equals("GET") || httpVerb.toUpperCase().equals("HEAD")) {
-            return false;
-        }
-
-        return requestBodyBytes != null && requestBodyBytes.length > 0;
     }
 }

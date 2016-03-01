@@ -21,7 +21,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class HMACFilterTest {
-    
+
     private final String id = "f0d16792-cdc9-4585-a5fd-bae3d898d8c5";
     private final String secretKey = "eox4TsBBPhpi737yMxpdBbr3sgg/DEC4m47VXO0B8qJLsbdMsmN47j/ZF/EFpyUKtAhm0OWXMGaAjRaho7/93Q==";
 
@@ -33,7 +33,7 @@ public class HMACFilterTest {
     public void setup() throws IOException, ServletException {
         //base Authorization parameter
         String realm = "Plexus";
-        
+
         String nonce = "64d02132-40bf-4fce-85bf-3f1bb1bfe7dd";
         String version = "2.0";
         String xAuthorizationTimestamp = "1449578521";
@@ -43,12 +43,13 @@ public class HMACFilterTest {
         //        String secretKey = "eox4TsBBPhpi737yMxpdBbr3sgg/DEC4m47VXO0B8qJLsbdMsmN47j/ZF/EFpyUKtAhm0OWXMGaAjRaho7/93Q==";
 
         String contentType = "application/json";
+        String xAuthorizationContentSha256 = "6paRNxUA7WawFxJpRp4cEixDjHq3jfIKX072k9slalo=";
         String reqBody = "{\"method\":\"hi.bob\",\"params\":[\"5\",\"4\",\"8\"]}";
 
         String signature = "4VtBHjqrdDeYrJySoJVDUHpN9u3vyTsyOLz4chezi98=";
 
-        HMACAuthorizationHeader authHeader = new HMACAuthorizationHeader(realm, id, nonce,
-            version, /*headers*/null, signature);
+        HMACAuthorizationHeader authHeader = new HMACAuthorizationHeader(realm, id, nonce, version, /*headers*/
+        null, signature);
 
         final ByteArrayInputStream realInputStream = new ByteArrayInputStream(reqBody.getBytes());
         ServletInputStream requestInputStream = new ServletInputStream() {
@@ -62,10 +63,15 @@ public class HMACFilterTest {
         when(this.request.getHeader("Authorization")).thenReturn(authHeader.toString());
         when(this.request.getHeader("X-Authorization-Timestamp")).thenReturn(
             xAuthorizationTimestamp);
+        when(this.request.getHeader("X-Authorization-Content-SHA256")).thenReturn(
+            xAuthorizationContentSha256);
+
         when(this.request.getMethod()).thenReturn(httpMethod);
         when(this.request.getServerName()).thenReturn("54.154.147.142:3000");
         when(this.request.getRequestURI()).thenReturn("/register");
         when(this.request.getQueryString()).thenReturn("");
+
+        when(this.request.getContentLength()).thenReturn(reqBody.getBytes("UTF-8").length);
         when(this.request.getContentType()).thenReturn(contentType);
         when(this.request.getInputStream()).thenReturn(requestInputStream);
 
