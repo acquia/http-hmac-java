@@ -171,6 +171,10 @@ public class HMACMessageCreator {
             HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
             if (entity != null) {
                 requestBody = entity.getContent();
+                //if contentLength is still 0, try setting it from entity
+                if (contentLength == 0) {
+                    contentLength = (int) entity.getContentLength();
+                }
             }
         }
 
