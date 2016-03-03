@@ -26,7 +26,7 @@ public class HMACFilterTest {
     private final String secretKey = "eox4TsBBPhpi737yMxpdBbr3sgg/DEC4m47VXO0B8qJLsbdMsmN47j/ZF/EFpyUKtAhm0OWXMGaAjRaho7/93Q==";
 
     private HttpServletRequest request;
-    private HttpServletResponse response;
+    private CharResponseWrapper wrappedResponse;
     private FilterChain filterChain;
 
     @Before
@@ -75,7 +75,7 @@ public class HMACFilterTest {
         when(this.request.getContentType()).thenReturn(contentType);
         when(this.request.getInputStream()).thenReturn(requestInputStream);
 
-        this.response = mock(HttpServletResponse.class);
+        this.wrappedResponse = mock(CharResponseWrapper.class);
         this.filterChain = mock(FilterChain.class);
     }
 
@@ -93,9 +93,9 @@ public class HMACFilterTest {
         FilterConfig filterConfig = mock(FilterConfig.class);
         when(filterConfig.getInitParameter("algorithm")).thenReturn("SHA256");
         testFilter.init(filterConfig);
-        testFilter.doFilter(this.request, this.response, this.filterChain);
+        testFilter.doFilter(this.request, this.wrappedResponse, this.filterChain);
 
-        verify(filterChain).doFilter(this.request, this.response);
+        verify(filterChain).doFilter(this.request, this.wrappedResponse);
     }
 
     @Test
@@ -112,10 +112,10 @@ public class HMACFilterTest {
         FilterConfig filterConfig = mock(FilterConfig.class);
         when(filterConfig.getInitParameter("algorithm")).thenReturn("SHA256");
         testFilter.init(filterConfig);
-        testFilter.doFilter(this.request, this.response, this.filterChain);
+        testFilter.doFilter(this.request, this.wrappedResponse, this.filterChain);
 
-        verify(response).sendError(eq(HttpServletResponse.SC_UNAUTHORIZED), (String) anyObject());
-        verify(filterChain, never()).doFilter(request, response);
+        verify(wrappedResponse).sendError(eq(HttpServletResponse.SC_UNAUTHORIZED), (String) anyObject());
+        verify(filterChain, never()).doFilter(request, wrappedResponse);
     }
 
 }

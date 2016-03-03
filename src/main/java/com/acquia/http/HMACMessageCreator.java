@@ -29,15 +29,17 @@ import org.apache.http.HttpRequest;
  */
 public class HMACMessageCreator {
 
-    private static final String ENCODING_UTF_8 = "UTF-8";
+    public static final String ENCODING_UTF_8 = "UTF-8";
 
-    private static final String PARAMETER_AUTHORIZATION = "Authorization";
-    private static final String PARAMETER_X_AUTHORIZATION_TIMESTAMP = "X-Authorization-Timestamp";
-    private static final String PARAMETER_X_AUTHORIZATION_CONTENT_SHA256 = "X-Authorization-Content-SHA256";
-    private static final String PARAMETER_CONTENT_LENGTH = "Content-Length";
-    private static final String PARAMETER_CONTENT_TYPE = "Content-Type";
+    public static final String PARAMETER_AUTHORIZATION = "Authorization";
+    public static final String PARAMETER_X_AUTHORIZATION_TIMESTAMP = "X-Authorization-Timestamp";
+    public static final String PARAMETER_X_AUTHORIZATION_CONTENT_SHA256 = "X-Authorization-Content-SHA256";
+    public static final String PARAMETER_CONTENT_LENGTH = "Content-Length";
+    public static final String PARAMETER_CONTENT_TYPE = "Content-Type";
 
-    private static final String PARAMETER_HOST = "Host";
+    public static final String PARAMETER_HOST = "Host";
+
+    public static final String PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256 = "X-Server-Authorization-HMAC-SHA256";
 
     /**
      * Constructor
@@ -47,7 +49,7 @@ public class HMACMessageCreator {
     }
 
     /**
-     * Create the message based on the given HTTP request received and list of custom headers.
+     * Create response signature message
      * 
      * @param request HTTP request
      * @return The message to be encrypted
@@ -106,7 +108,7 @@ public class HMACMessageCreator {
     }
 
     /**
-     * Create the message based on the given HTTP request to be sent and the list of custom header names.
+     * Create response signature message
      * 
      * @param request; HTTP request
      * @param authHeader; specify authHeader
@@ -202,7 +204,7 @@ public class HMACMessageCreator {
     }
 
     /**
-     * Create the message based on the given components of the request.
+     * Helper method to create request signature message
      * 
      * @param httpVerb; HTTP request method (GET, POST, etc)
      * @param host; HTTP "Host" request header field (including any port number)
@@ -305,4 +307,25 @@ public class HMACMessageCreator {
         byteOutputStream.close();
         return byteOutputStream.toByteArray();
     }
+
+    /**
+     * Create response signature message
+     * 
+     * @param nonce
+     * @param xAuthorizationTimestamp
+     * @param responseContent
+     * @return
+     */
+    public String createMessage(String nonce, String xAuthorizationTimestamp, String responseContent) {
+        if (responseContent == null) {
+            responseContent = "";
+        }
+
+        StringBuilder result = new StringBuilder();
+        result.append(nonce).append("\n");
+        result.append(xAuthorizationTimestamp).append("\n");
+        result.append(responseContent);
+        return result.toString();
+    }
+
 }

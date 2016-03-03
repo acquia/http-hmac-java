@@ -38,39 +38,61 @@ public abstract class HMACFilter implements Filter {
     }
 
     @Override
-    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
-        if (req instanceof HttpServletRequest) {
-            HttpServletRequest request = (HttpServletRequest) req;
-            HttpServletResponse response = (HttpServletResponse) res;
+        if (request instanceof HttpServletRequest && response instanceof HttpServletResponse) {
+            HttpServletRequest httpRequest = (HttpServletRequest) request;
+            HttpServletResponse httpResponse = (HttpServletResponse) response;
+            CharResponseWrapper wrappedResponse = new CharResponseWrapper(httpResponse);
 
-            String authorization = request.getHeader("Authorization");
+            String authorization = httpRequest.getHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION);
+            String xAuthorizationTimestamp = httpRequest.getHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
             if (authorization != null) {
                 HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
 
                 String accessKey = authHeader.getId();
+                String nonce = authHeader.getNonce();
                 String signature = authHeader.getSignature();
 
                 String secretKey = getSecretKey(accessKey);
 
+                //check request validity
                 HMACMessageCreator messageCreator = new HMACMessageCreator();
-                String message = messageCreator.createMessage(request);
+                String signableRequestMessage = messageCreator.createMessage(httpRequest);
+                String signedRequestMessage = "";
                 try {
-                    String calculatedSignature = this.algorithm.encryptMessage(secretKey, message);
-                    if (signature.compareTo(calculatedSignature) != 0) {
-                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                            "Error: Invalid authentication token.");
-                        return;
-                    } else {
-                        chain.doFilter(req, res);
-                        return;
-                    }
+                    signedRequestMessage = this.algorithm.encryptMessage(secretKey,
+                        signableRequestMessage);
                 } catch(SignatureException e) {
-                    throw new IOException("Could not create calculated signature", e);
+                    throw new IOException("Fail to sign request message", e);
                 }
+
+                if (signature.compareTo(signedRequestMessage) != 0) {
+                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                        "Error: Invalid authentication token.");
+                    return;
+                }
+
+                //pass along to other filter
+                chain.doFilter(request, wrappedResponse);
+
+                //set response validation header
+                String responseContent = wrappedResponse.toString();
+                String signableResponseMessage = messageCreator.createMessage(nonce,
+                    xAuthorizationTimestamp, responseContent);
+                String signedResponseMessage = "";
+                try {
+                    signedResponseMessage = this.algorithm.encryptMessage(secretKey,
+                        signableResponseMessage);
+                } catch(SignatureException e) {
+                    throw new IOException("Fail to sign response message", e);
+                }
+                httpResponse.setHeader(
+                    HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256,
+                    signedResponseMessage);
             }
 
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+            httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
                 "Error: No authentication credentials were found.");
             return;
         }
@@ -88,4 +110,5 @@ public abstract class HMACFilter implements Filter {
      * @return Secret Key
      */
     protected abstract String getSecretKey(String accessKey);
+
 }

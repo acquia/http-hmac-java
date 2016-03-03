@@ -89,16 +89,17 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         HMACAuthorizationHeader authHeader = this.createHMACAuthorizationHeader();
 
         HMACMessageCreator messageCreator = new HMACMessageCreator();
-        String message = messageCreator.createMessage(request, authHeader);
-        String encryptedMessage = "";
+        String signableRequestMessage = messageCreator.createMessage(request, authHeader);
+        String signedRequestMessage = "";
         try {
-            encryptedMessage = this.algorithm.encryptMessage(this.secretKey, message);
+            signedRequestMessage = this.algorithm.encryptMessage(this.secretKey,
+                signableRequestMessage);
         } catch(SignatureException e) {
-            throw new IOException("Could not encrypt message", e);
+            throw new IOException("Fail to sign request message", e);
         }
 
-        authHeader.setSignature(encryptedMessage);
-        request.setHeader("Authorization", authHeader.toString()); //set it with encrypted signature
+        authHeader.setSignature(signedRequestMessage);
+        request.setHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION, authHeader.toString()); //set it with encrypted signature
     }
 
     /**

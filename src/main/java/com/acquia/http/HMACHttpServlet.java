@@ -53,17 +53,21 @@ public abstract class HMACHttpServlet extends HttpServlet {
 
                 String secretKey = getSecretKey(accessKey);
 
+                //check request validity
                 HMACMessageCreator messageCreator = new HMACMessageCreator();
-                String message = messageCreator.createMessage(request);
+                String signableRequestMessage = messageCreator.createMessage(request);
+                String signedRequestMessage = "";
                 try {
-                    String calculatedSignature = this.algorithm.encryptMessage(secretKey, message);
-                    if (signature.compareTo(calculatedSignature) != 0) {
-                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                            "Error: Invalid authentication token.");
-                        return;
-                    }
+                    signedRequestMessage = this.algorithm.encryptMessage(secretKey,
+                        signableRequestMessage);
                 } catch(SignatureException e) {
-                    throw new IOException("Could not create calculated signature", e);
+                    throw new IOException("Fail to sign request message", e);
+                }
+
+                if (signature.compareTo(signedRequestMessage) != 0) {
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                        "Error: Invalid authentication token.");
+                    return;
                 }
             }
 
