@@ -60,10 +60,11 @@ public class HMACFilterTest {
         };
 
         this.request = mock(HttpServletRequest.class);
-        when(this.request.getHeader("Authorization")).thenReturn(authHeader.toString());
-        when(this.request.getHeader("X-Authorization-Timestamp")).thenReturn(
+        when(this.request.getHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION)).thenReturn(
+            authHeader.toString());
+        when(this.request.getHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP)).thenReturn(
             xAuthorizationTimestamp);
-        when(this.request.getHeader("X-Authorization-Content-SHA256")).thenReturn(
+        when(this.request.getHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_CONTENT_SHA256)).thenReturn(
             xAuthorizationContentSha256);
 
         when(this.request.getMethod()).thenReturn(httpMethod);
@@ -71,7 +72,8 @@ public class HMACFilterTest {
         when(this.request.getRequestURI()).thenReturn("/register");
         when(this.request.getQueryString()).thenReturn("");
 
-        when(this.request.getContentLength()).thenReturn(reqBody.getBytes("UTF-8").length);
+        when(this.request.getContentLength()).thenReturn(
+            reqBody.getBytes(HMACMessageCreator.ENCODING_UTF_8).length);
         when(this.request.getContentType()).thenReturn(contentType);
         when(this.request.getInputStream()).thenReturn(requestInputStream);
 
@@ -114,7 +116,8 @@ public class HMACFilterTest {
         testFilter.init(filterConfig);
         testFilter.doFilter(this.request, this.wrappedResponse, this.filterChain);
 
-        verify(wrappedResponse).sendError(eq(HttpServletResponse.SC_UNAUTHORIZED), (String) anyObject());
+        verify(wrappedResponse).sendError(eq(HttpServletResponse.SC_UNAUTHORIZED),
+            (String) anyObject());
         verify(filterChain, never()).doFilter(request, wrappedResponse);
     }
 

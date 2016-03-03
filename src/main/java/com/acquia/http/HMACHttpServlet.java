@@ -44,7 +44,7 @@ public abstract class HMACHttpServlet extends HttpServlet {
             HttpServletRequest request = (HttpServletRequest) req;
             HttpServletResponse response = (HttpServletResponse) res;
 
-            String authorization = request.getHeader("Authorization");
+            String authorization = request.getHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION);
             if (authorization != null) {
                 HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
 

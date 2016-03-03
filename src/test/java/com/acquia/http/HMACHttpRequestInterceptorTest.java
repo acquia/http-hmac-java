@@ -63,9 +63,9 @@ public class HMACHttpRequestInterceptorTest {
         when(request.getEntity()).thenReturn(requestEntity);
 
         Header hostPortHeader = mockHeader(hostPort);
-        when(request.getFirstHeader("Host")).thenReturn(hostPortHeader);
+        when(request.getFirstHeader(HMACMessageCreator.PARAMETER_HOST)).thenReturn(hostPortHeader);
         Header xAuthorizationTimestampHeader = mockHeader(xAuthorizationTimestamp);
-        when(request.getFirstHeader("X-Authorization-Timestamp")).thenReturn(
+        when(request.getFirstHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP)).thenReturn(
             xAuthorizationTimestampHeader);
 
         HttpContext context = mock(HttpContext.class);
@@ -76,7 +76,7 @@ public class HMACHttpRequestInterceptorTest {
                 Object[] args = invocation.getArguments();
                 String headerKey = (String) args[0];
                 String valueKey = (String) args[1];
-                if ("Authorization".equals(headerKey)) {
+                if (HMACMessageCreator.PARAMETER_AUTHORIZATION.equals(headerKey)) {
                     calcAuthorizationHeader.append(valueKey);
                 }
                 return null;
@@ -142,16 +142,18 @@ public class HMACHttpRequestInterceptorTest {
         when(request.getEntity()).thenReturn(requestEntity);
 
         Header hostPortHeader = mockHeader(hostPort);
-        when(request.getFirstHeader("Host")).thenReturn(hostPortHeader);
-        Header contentLengthHeader = mockHeader(Integer.toString(reqBody.getBytes("UTF-8").length));
-        when(request.getFirstHeader("Content-Length")).thenReturn(contentLengthHeader);
+        when(request.getFirstHeader(HMACMessageCreator.PARAMETER_HOST)).thenReturn(hostPortHeader);
+        Header contentLengthHeader = mockHeader(Integer.toString(reqBody.getBytes(HMACMessageCreator.ENCODING_UTF_8).length));
+        when(request.getFirstHeader(HMACMessageCreator.PARAMETER_CONTENT_LENGTH)).thenReturn(
+            contentLengthHeader);
         Header contentTypeHeader = mockHeader(contentType);
-        when(request.getFirstHeader("Content-Type")).thenReturn(contentTypeHeader);
+        when(request.getFirstHeader(HMACMessageCreator.PARAMETER_CONTENT_TYPE)).thenReturn(
+            contentTypeHeader);
         Header xAuthorizationContentSha256Header = mockHeader(xAuthorizationContentSha256);
-        when(request.getFirstHeader("X-Authorization-Content-SHA256")).thenReturn(
+        when(request.getFirstHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_CONTENT_SHA256)).thenReturn(
             xAuthorizationContentSha256Header);
         Header xAuthorizationTimestampHeader = mockHeader(xAuthorizationTimestamp);
-        when(request.getFirstHeader("X-Authorization-Timestamp")).thenReturn(
+        when(request.getFirstHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP)).thenReturn(
             xAuthorizationTimestampHeader);
         HttpContext context = mock(HttpContext.class);
 
@@ -161,7 +163,7 @@ public class HMACHttpRequestInterceptorTest {
                 Object[] args = invocation.getArguments();
                 String headerKey = (String) args[0];
                 String valueKey = (String) args[1];
-                if ("Authorization".equals(headerKey)) {
+                if (HMACMessageCreator.PARAMETER_AUTHORIZATION.equals(headerKey)) {
                     calcAuthorizationHeader.append(valueKey);
                 }
                 return null;

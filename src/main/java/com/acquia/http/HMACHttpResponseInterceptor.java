@@ -69,7 +69,6 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
     public void process(HttpResponse response, HttpContext context) throws HttpException,
             IOException {
         String signableResponseMessage = this.createMessage();
-        System.out.println("---- message:\n" + signableResponseMessage);
         String signedResponseMessage = "";
         try {
             signedResponseMessage = this.algorithm.encryptMessage(this.secretKey,
@@ -77,9 +76,9 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
         } catch(SignatureException e) {
             throw new IOException("Fail to sign response message", e);
         }
-        System.out.println("---- encryptedMessage:\n" + signedResponseMessage);
 
-        response.setHeader("X-Server-Authorization-HMAC-SHA256", signedResponseMessage);
+        response.setHeader(HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256,
+            signedResponseMessage);
     }
 
     /**
