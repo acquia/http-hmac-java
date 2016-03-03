@@ -55,7 +55,7 @@ public class HMACMessageCreator {
      * @return The message to be encrypted
      * @throws IOException if bodyHash cannot be created
      */
-    public String createMessage(HttpServletRequest request) throws IOException {
+    public String createSignableRequestMessage(HttpServletRequest request) throws IOException {
         String httpVerb = request.getMethod().toUpperCase();
 
         int port = request.getServerPort();
@@ -78,7 +78,7 @@ public class HMACMessageCreator {
         String xAuthorizationContentSha256 = request.getHeader(PARAMETER_X_AUTHORIZATION_CONTENT_SHA256);
         InputStream requestBody = request.getInputStream();
 
-        return this.createMessage(httpVerb, host, path, queryParameters, authHeader,
+        return this.createSignableRequestMessage(httpVerb, host, path, queryParameters, authHeader,
             authorizationCustomHeaderParameterMap, xAuthorizationTimestamp, contentLength,
             contentType, xAuthorizationContentSha256, requestBody);
     }
@@ -115,7 +115,7 @@ public class HMACMessageCreator {
      * @return The message to be encrypted
      * @throws IOException if bodyHash cannot be created
      */
-    protected String createMessage(HttpRequest request, HMACAuthorizationHeader authHeader)
+    protected String createSignableRequestMessage(HttpRequest request, HMACAuthorizationHeader authHeader)
             throws IOException {
         String httpVerb = request.getRequestLine().getMethod().toUpperCase();
 
@@ -178,7 +178,7 @@ public class HMACMessageCreator {
             }
         }
 
-        return this.createMessage(httpVerb, host, path, queryParameters, authHeader,
+        return this.createSignableRequestMessage(httpVerb, host, path, queryParameters, authHeader,
             authorizationCustomHeaderParameterMap, xAuthorizationTimestamp, contentLength,
             contentType, xAuthorizationContentSha256, requestBody);
     }
@@ -224,7 +224,7 @@ public class HMACMessageCreator {
      * @return The message to be encrypted
      * @throws IOException if bodyHash cannot be created
      */
-    private String createMessage(String httpVerb, String host, String path, String queryParameters,
+    private String createSignableRequestMessage(String httpVerb, String host, String path, String queryParameters,
             HMACAuthorizationHeader authHeader,
             Map<String, String> authorizationCustomHeaderParameterMap,
             String xAuthorizationTimestamp, int contentLength, String contentType,
@@ -320,7 +320,7 @@ public class HMACMessageCreator {
      * @param responseContent
      * @return
      */
-    public String createMessage(String nonce, String xAuthorizationTimestamp, String responseContent) {
+    public String createSignableResponseMessage(String nonce, String xAuthorizationTimestamp, String responseContent) {
         if (responseContent == null) {
             responseContent = "";
         }

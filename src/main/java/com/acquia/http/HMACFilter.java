@@ -14,6 +14,7 @@ import javax.servlet.http.HttpServletResponse;
 
 /**
  * Abstract Filter that can validate HTTP requests by the HMAC Authorization header.
+ * This will also append server validation response header.
  * 
  * @author chris.nagy
  *
@@ -58,7 +59,7 @@ public abstract class HMACFilter implements Filter {
 
                 //check request validity
                 HMACMessageCreator messageCreator = new HMACMessageCreator();
-                String signableRequestMessage = messageCreator.createMessage(httpRequest);
+                String signableRequestMessage = messageCreator.createSignableRequestMessage(httpRequest);
                 String signedRequestMessage = "";
                 try {
                     signedRequestMessage = this.algorithm.encryptMessage(secretKey,
@@ -78,8 +79,8 @@ public abstract class HMACFilter implements Filter {
 
                 //set response validation header
                 String responseContent = wrappedResponse.toString();
-                String signableResponseMessage = messageCreator.createMessage(nonce,
-                    xAuthorizationTimestamp, responseContent);
+                String signableResponseMessage = messageCreator.createSignableResponseMessage(
+                    nonce, xAuthorizationTimestamp, responseContent);
                 String signedResponseMessage = "";
                 try {
                     signedResponseMessage = this.algorithm.encryptMessage(secretKey,

@@ -89,7 +89,8 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         HMACAuthorizationHeader authHeader = this.createHMACAuthorizationHeader();
 
         HMACMessageCreator messageCreator = new HMACMessageCreator();
-        String signableRequestMessage = messageCreator.createMessage(request, authHeader);
+        String signableRequestMessage = messageCreator.createSignableRequestMessage(request,
+            authHeader);
         String signedRequestMessage = "";
         try {
             signedRequestMessage = this.algorithm.encryptMessage(this.secretKey,

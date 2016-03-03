@@ -13,6 +13,7 @@ import javax.servlet.http.HttpServletResponse;
 
 /**
  * An abstract class that will validate the Authorization header based on the HMAC.
+ * This will also append server validation response header.
  * 
  * @author chris.nagy
  */
@@ -40,6 +41,25 @@ public abstract class HMACHttpServlet extends HttpServlet {
     @Override
     public void service(ServletRequest request, ServletResponse response) throws ServletException,
             IOException {
+        //upon entry
+        this.validateRequestAuthorization(request, response);
+
+        //do service
+        super.service(request, response);
+
+        //upon exit
+        this.appendServerResponseValidation(request, response);
+    }
+
+    /**
+     * Helper method to validate request authorization
+     * 
+     * @param request
+     * @param response
+     * @throws IOException
+     */
+    private void validateRequestAuthorization(ServletRequest request, ServletResponse response)
+            throws IOException {
         if (request instanceof HttpServletRequest && response instanceof HttpServletResponse) {
             HttpServletRequest httpRequest = (HttpServletRequest) request;
             HttpServletResponse httpResponse = (HttpServletResponse) response;
@@ -55,7 +75,7 @@ public abstract class HMACHttpServlet extends HttpServlet {
 
                 //check request validity
                 HMACMessageCreator messageCreator = new HMACMessageCreator();
-                String signableRequestMessage = messageCreator.createMessage(httpRequest);
+                String signableRequestMessage = messageCreator.createSignableRequestMessage(httpRequest);
                 String signedRequestMessage = "";
                 try {
                     signedRequestMessage = this.algorithm.encryptMessage(secretKey,
@@ -75,7 +95,54 @@ public abstract class HMACHttpServlet extends HttpServlet {
                 "Error: No authentication credentials were found.");
             return;
         }
-        super.service(request, response);
+    }
+
+    /**
+     * Helper method to append server response validation
+     * 
+     * @param request
+     * @param response
+     * @throws IOException
+     */
+    private void appendServerResponseValidation(ServletRequest request, ServletResponse response)
+            throws IOException {
+        if (request instanceof HttpServletRequest && response instanceof HttpServletResponse) {
+            HttpServletRequest httpRequest = (HttpServletRequest) request;
+            HttpServletResponse httpResponse = (HttpServletResponse) response;
+            CharResponseWrapper wrappedResponse = new CharResponseWrapper(httpResponse);
+
+            String authorization = httpRequest.getHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION);
+            String xAuthorizationTimestamp = httpRequest.getHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
+            if (authorization != null) {
+                HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
+
+                String accessKey = authHeader.getId();
+                String nonce = authHeader.getNonce();
+
+                String secretKey = getSecretKey(accessKey);
+
+                //set response validation header
+                HMACMessageCreator messageCreator = new HMACMessageCreator();
+                String responseContent = wrappedResponse.toString();
+                String signableResponseMessage = messageCreator.createSignableResponseMessage(nonce,
+                    xAuthorizationTimestamp, responseContent);
+                String signedResponseMessage = "";
+                try {
+                    signedResponseMessage = this.algorithm.encryptMessage(secretKey,
+                        signableResponseMessage);
+                } catch(SignatureException e) {
+                    throw new IOException("Fail to sign response message", e);
+                }
+                httpResponse.setHeader(
+                    HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256,
+                    signedResponseMessage);
+                httpResponse.getOutputStream().write(wrappedResponse.getByteArray()); //write back the response
+            }
+
+            httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                "Error: No authentication credentials were found.");
+            return;
+        }
     }
 
     /** 
@@ -85,4 +152,5 @@ public abstract class HMACHttpServlet extends HttpServlet {
      * @return Secret Key
      */
     protected abstract String getSecretKey(String accessKey);
+
 }
