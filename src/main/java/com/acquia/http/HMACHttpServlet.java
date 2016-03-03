@@ -38,10 +38,10 @@ public abstract class HMACHttpServlet extends HttpServlet {
     }
 
     @Override
-    public void service(ServletRequest reqquest, ServletResponse response) throws ServletException,
+    public void service(ServletRequest request, ServletResponse response) throws ServletException,
             IOException {
-        if (reqquest instanceof HttpServletRequest && response instanceof HttpServletResponse) {
-            HttpServletRequest httpRequest = (HttpServletRequest) reqquest;
+        if (request instanceof HttpServletRequest && response instanceof HttpServletResponse) {
+            HttpServletRequest httpRequest = (HttpServletRequest) request;
             HttpServletResponse httpResponse = (HttpServletResponse) response;
 
             String authorization = httpRequest.getHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION);
@@ -75,7 +75,7 @@ public abstract class HMACHttpServlet extends HttpServlet {
                 "Error: No authentication credentials were found.");
             return;
         }
-        super.service(reqquest, response);
+        super.service(request, response);
     }
 
     /** 
