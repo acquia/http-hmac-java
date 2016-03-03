@@ -38,13 +38,13 @@ public abstract class HMACHttpServlet extends HttpServlet {
     }
 
     @Override
-    public void service(ServletRequest req, ServletResponse res) throws ServletException,
+    public void service(ServletRequest reqquest, ServletResponse response) throws ServletException,
             IOException {
-        if (req instanceof HttpServletRequest) {
-            HttpServletRequest request = (HttpServletRequest) req;
-            HttpServletResponse response = (HttpServletResponse) res;
+        if (reqquest instanceof HttpServletRequest && response instanceof HttpServletResponse) {
+            HttpServletRequest httpRequest = (HttpServletRequest) reqquest;
+            HttpServletResponse httpResponse = (HttpServletResponse) response;
 
-            String authorization = request.getHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION);
+            String authorization = httpRequest.getHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION);
             if (authorization != null) {
                 HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
 
@@ -55,7 +55,7 @@ public abstract class HMACHttpServlet extends HttpServlet {
 
                 //check request validity
                 HMACMessageCreator messageCreator = new HMACMessageCreator();
-                String signableRequestMessage = messageCreator.createMessage(request);
+                String signableRequestMessage = messageCreator.createMessage(httpRequest);
                 String signedRequestMessage = "";
                 try {
                     signedRequestMessage = this.algorithm.encryptMessage(secretKey,
@@ -65,17 +65,17 @@ public abstract class HMACHttpServlet extends HttpServlet {
                 }
 
                 if (signature.compareTo(signedRequestMessage) != 0) {
-                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
                         "Error: Invalid authentication token.");
                     return;
                 }
             }
 
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+            httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
                 "Error: No authentication credentials were found.");
             return;
         }
-        super.service(req, res);
+        super.service(reqquest, response);
     }
 
     /** 

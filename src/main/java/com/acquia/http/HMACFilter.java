@@ -90,6 +90,7 @@ public abstract class HMACFilter implements Filter {
                 httpResponse.setHeader(
                     HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256,
                     signedResponseMessage);
+                httpResponse.getOutputStream().write(wrappedResponse.getByteArray()); //write back the response
             }
 
             httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,

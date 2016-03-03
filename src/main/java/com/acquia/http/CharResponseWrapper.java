@@ -3,6 +3,7 @@ package com.acquia.http;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
@@ -17,13 +18,15 @@ import javax.servlet.http.HttpServletResponseWrapper;
  */
 public class CharResponseWrapper extends HttpServletResponseWrapper {
 
+    public static final String ENCODING_UTF_8 = "UTF-8";
+
     /**
      * Helper class to allow getting ServletOutputStream
      * 
      * @author aric.tatan
      *
      */
-    private static class ByteArrayServletStream extends ServletOutputStream {
+    public static class ByteArrayServletStream extends ServletOutputStream {
         ByteArrayOutputStream baos;
 
         ByteArrayServletStream(ByteArrayOutputStream baos) {
@@ -54,17 +57,26 @@ public class CharResponseWrapper extends HttpServletResponseWrapper {
             return sos;
         }
 
-        byte[] toByteArray() {
+        public byte[] toByteArray() {
             return baos.toByteArray();
+        }
+
+        @Override
+        public String toString() {
+            String result = "";
+            try {
+                result = new String(baos.toByteArray(), ENCODING_UTF_8);
+            } catch(UnsupportedEncodingException e) {
+                e.printStackTrace();
+            }
+            return result;
         }
     }
 
     private ByteArrayPrintWriter output;
-    private boolean usingWriter;
 
     public CharResponseWrapper(HttpServletResponse response) {
         super(response);
-        usingWriter = false;
         output = new ByteArrayPrintWriter();
     }
 
@@ -74,21 +86,11 @@ public class CharResponseWrapper extends HttpServletResponseWrapper {
 
     @Override
     public ServletOutputStream getOutputStream() throws IOException {
-        // will error out, if in use
-        if (usingWriter) {
-            super.getOutputStream();
-        }
-        usingWriter = true;
         return output.getStream();
     }
 
     @Override
     public PrintWriter getWriter() throws IOException {
-        // will error out, if in use
-        if (usingWriter) {
-            super.getWriter();
-        }
-        usingWriter = true;
         return output.getWriter();
     }
 
