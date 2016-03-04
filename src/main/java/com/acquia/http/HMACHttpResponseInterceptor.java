@@ -21,16 +21,6 @@ import org.apache.http.protocol.HttpContext;
 public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
 
     /**
-     * Timestamp when request was made
-     */
-    protected String xAuthorizationTimestamp;
-
-    /**
-     * Nonce when request was made
-     */
-    protected String nonce;
-
-    /**
      * The secret key
      */
     protected String secretKey;
@@ -43,16 +33,10 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
     /**
      * Constructor
      * 
-     * @param nonce; nonce when request was made
-     * @param xAuthorizationTimestamp; timestamp when request was made
-     * @param responseBody; response body
      * @param secretKey; secret key used to encrypt the message
      * @param algorithmName; for example: SHA256
      */
-    public HMACHttpResponseInterceptor(String nonce, String xAuthorizationTimestamp,
-            String secretKey, String algorithmName) {
-        this.nonce = nonce;
-        this.xAuthorizationTimestamp = xAuthorizationTimestamp;
+    public HMACHttpResponseInterceptor(String secretKey, String algorithmName) {
         this.secretKey = secretKey;
 
         HMACAlgorithmFactory algorithmFactory = new HMACAlgorithmFactory();
@@ -63,14 +47,27 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
     public void process(HttpResponse response, HttpContext context) throws HttpException,
             IOException {
         //get server response signature
-        String serverSignature = "";
         Header serverAuthResponseHeader = response.getFirstHeader(HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256);
-        if (serverAuthResponseHeader != null) {
-            serverSignature = serverAuthResponseHeader.getValue();
+        if (serverAuthResponseHeader == null) {
+            throw new HttpException("Error: Server failed to provide response validation.");
+        }
+        String serverSignature = serverAuthResponseHeader.getValue();
+
+        //get nonce of when request was made
+        HMACAuthorizationHeader authHeader = (HMACAuthorizationHeader) context.getAttribute("authHeader");
+        if (authHeader == null) {
+            throw new HttpException("Error: No authHeader in the HTTP context.");
+        }
+        String nonce = authHeader.getNonce();
+
+        //get xAuthorizationTimestamp of when request was made
+        String xAuthorizationTimestamp = (String) context.getAttribute("xAuthorizationTimestamp");
+        if (xAuthorizationTimestamp == null) {
+            throw new HttpException("Error: No xAuthorizationTimestamp in the HTTP context.");
         }
 
         //get server response body
-        String responseBody = "";
+        String responseContent = "";
         HttpEntity entity = response.getEntity();
         if (entity != null && entity.getContentLength() > 0) {
             StringBuilder respStringBuilder = new StringBuilder();
@@ -86,11 +83,13 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
             } catch(Exception e) {
                 e.printStackTrace();
             }
-            responseBody = respStringBuilder.toString();
+            responseContent = respStringBuilder.toString();
         }
 
         //check response validity
-        String signableResponseMessage = this.createMessage(responseBody);
+        HMACMessageCreator messageCreator = new HMACMessageCreator();
+        String signableResponseMessage = messageCreator.createSignableResponseMessage(nonce,
+            xAuthorizationTimestamp, responseContent);
         String signedResponseMessage = "";
         try {
             signedResponseMessage = this.algorithm.encryptMessage(this.secretKey,
@@ -100,21 +99,8 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
         }
 
         if (serverSignature.compareTo(signedResponseMessage) != 0) {
-            throw new HttpException("Error: Invalid server response validation."); //FIXME: is throwing HttpException okay?
+            throw new HttpException("Error: Invalid server response validation.");
         }
-    }
-
-    /**
-     * Helper method to create response signature message
-     * 
-     * @return
-     */
-    private String createMessage(String responseBody) {
-        StringBuilder responseSignatureBuilder = new StringBuilder();
-        responseSignatureBuilder.append(this.nonce).append("\n");
-        responseSignatureBuilder.append(this.xAuthorizationTimestamp).append("\n");
-        responseSignatureBuilder.append(responseBody);
-        return responseSignatureBuilder.toString();
     }
 
 }

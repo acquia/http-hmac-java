@@ -101,6 +101,12 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
 
         authHeader.setSignature(signedRequestMessage);
         request.setHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION, authHeader.toString()); //set it with encrypted signature
+
+        //set context for response interceptor
+        context.setAttribute("authHeader", authHeader);
+        context.setAttribute(
+            "xAuthorizationTimestamp",
+            request.getFirstHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue());
     }
 
     /**

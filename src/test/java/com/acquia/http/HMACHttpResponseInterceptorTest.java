@@ -19,7 +19,10 @@ public class HMACHttpResponseInterceptorTest {
     @Test
     public void testResponseValidationHeader() throws IOException, HttpException {
         //base Authorization parameter
+        String realm = "Plexus";
+        String id = "f0d16792-cdc9-4585-a5fd-bae3d898d8c5";
         String nonce = "64d02132-40bf-4fce-85bf-3f1bb1bfe7dd";
+        String version = "2.0";
         String xAuthorizationTimestamp = "1449578521";
 
         String secretKey = "eox4TsBBPhpi737yMxpdBbr3sgg/DEC4m47VXO0B8qJLsbdMsmN47j/ZF/EFpyUKtAhm0OWXMGaAjRaho7/93Q==";
@@ -28,9 +31,7 @@ public class HMACHttpResponseInterceptorTest {
 
         String expectedServerAuthResponseSignature = "3uUNS0PW5+fl6x1ZCcHxnt0Me0PWvtNBGsH5F17P+h8=";
 
-        HMACHttpResponseInterceptor responseInterceptor = new HMACHttpResponseInterceptor(nonce,
-            xAuthorizationTimestamp, secretKey, "SHA256");
-
+        //mock response
         HttpResponse response = mock(HttpResponse.class);
 
         final ByteArrayInputStream realInputStream = new ByteArrayInputStream(respBody.getBytes());
@@ -51,8 +52,15 @@ public class HMACHttpResponseInterceptorTest {
             response.getFirstHeader(HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256)).thenReturn(
             xServerAuthorizationHmacSha256Header);
 
+        //mock context
         HttpContext context = mock(HttpContext.class);
+        when(context.getAttribute("authHeader")).thenReturn(
+            new HMACAuthorizationHeader(realm, id, nonce, version));
+        when(context.getAttribute("xAuthorizationTimestamp")).thenReturn(xAuthorizationTimestamp);
 
+        //test response interceptor
+        HMACHttpResponseInterceptor responseInterceptor = new HMACHttpResponseInterceptor(
+            secretKey, "SHA256");
         responseInterceptor.process(response, context); //this will throw HttpException if not passed
     }
 
