@@ -67,7 +67,8 @@ public class HMACMessageCreator {
         }
 
         String authorization = request.getHeader(PARAMETER_AUTHORIZATION);
-        HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
+        HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
+            authorization);
 
         Map<String, String> authorizationCustomHeaderParameterMap = this.getCustomHeaderMap(
             authHeader, request);
@@ -75,7 +76,8 @@ public class HMACMessageCreator {
         String xAuthorizationTimestamp = request.getHeader(PARAMETER_X_AUTHORIZATION_TIMESTAMP);
         int contentLength = request.getContentLength();
         String contentType = request.getContentType();
-        String xAuthorizationContentSha256 = request.getHeader(PARAMETER_X_AUTHORIZATION_CONTENT_SHA256);
+        String xAuthorizationContentSha256 = request.getHeader(
+            PARAMETER_X_AUTHORIZATION_CONTENT_SHA256);
         InputStream requestBody = request.getInputStream();
 
         return this.createSignableRequestMessage(httpVerb, host, path, queryParameters, authHeader,
@@ -115,8 +117,8 @@ public class HMACMessageCreator {
      * @return The message to be encrypted
      * @throws IOException if bodyHash cannot be created
      */
-    protected String createSignableRequestMessage(HttpRequest request, HMACAuthorizationHeader authHeader)
-            throws IOException {
+    protected String createSignableRequestMessage(HttpRequest request,
+            HMACAuthorizationHeader authHeader) throws IOException {
         String httpVerb = request.getRequestLine().getMethod().toUpperCase();
 
         String host = request.getFirstHeader(PARAMETER_HOST).getValue();
@@ -142,7 +144,8 @@ public class HMACMessageCreator {
         Map<String, String> authorizationCustomHeaderParameterMap = this.getCustomHeaderMap(
             authHeader, request);
 
-        String xAuthorizationTimestamp = request.getFirstHeader(PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue();
+        String xAuthorizationTimestamp = request.getFirstHeader(
+            PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue();
 
         //optional content length
         Header contentLengthHeader = request.getFirstHeader(PARAMETER_CONTENT_LENGTH);
@@ -159,7 +162,8 @@ public class HMACMessageCreator {
         }
 
         //optional authorization content sha256
-        Header xAuthorizationContentSha256Header = request.getFirstHeader(PARAMETER_X_AUTHORIZATION_CONTENT_SHA256);
+        Header xAuthorizationContentSha256Header = request.getFirstHeader(
+            PARAMETER_X_AUTHORIZATION_CONTENT_SHA256);
         String xAuthorizationContentSha256 = "";
         if (xAuthorizationContentSha256Header != null) {
             xAuthorizationContentSha256 = xAuthorizationContentSha256Header.getValue();
@@ -224,8 +228,8 @@ public class HMACMessageCreator {
      * @return The message to be encrypted
      * @throws IOException if bodyHash cannot be created
      */
-    private String createSignableRequestMessage(String httpVerb, String host, String path, String queryParameters,
-            HMACAuthorizationHeader authHeader,
+    private String createSignableRequestMessage(String httpVerb, String host, String path,
+            String queryParameters, HMACAuthorizationHeader authHeader,
             Map<String, String> authorizationCustomHeaderParameterMap,
             String xAuthorizationTimestamp, int contentLength, String contentType,
             String xAuthorizationContentSha256, InputStream requestBody) throws IOException {
@@ -300,16 +304,16 @@ public class HMACMessageCreator {
             return null;
         }
 
-        byte[] byteChunk = new byte[1000];
+        byte[] byteChunk = new byte[1024];
         int length = -1;
 
-        ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
         while ((length = inputStream.read(byteChunk)) != -1) {
-            byteOutputStream.write(byteChunk, 0, length);
+            baos.write(byteChunk, 0, length);
         }
-        byteOutputStream.flush();
-        byteOutputStream.close();
-        return byteOutputStream.toByteArray();
+        baos.flush();
+        baos.close();
+        return baos.toByteArray();
     }
 
     /**
@@ -320,7 +324,8 @@ public class HMACMessageCreator {
      * @param responseContent
      * @return
      */
-    public String createSignableResponseMessage(String nonce, String xAuthorizationTimestamp, String responseContent) {
+    public String createSignableResponseMessage(String nonce, String xAuthorizationTimestamp,
+            String responseContent) {
         if (responseContent == null) {
             responseContent = "";
         }

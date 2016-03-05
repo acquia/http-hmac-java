@@ -84,7 +84,7 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
                 StringBuilder respStringBuilder = new StringBuilder();
                 try {
                     BufferedReader reader = new BufferedReader(new InputStreamReader(
-                        entity.getContent(), HMACMessageCreator.ENCODING_UTF_8), 1000);
+                        entity.getContent(), HMACMessageCreator.ENCODING_UTF_8), 1024);
                     String line = null;
                     while ((line = reader.readLine()) != null) {
                         respStringBuilder.append(line);
