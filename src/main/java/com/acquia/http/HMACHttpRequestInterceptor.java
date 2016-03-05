@@ -85,7 +85,8 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
     }
 
     @Override
-    public void process(HttpRequest request, HttpContext context) throws HttpException, IOException {
+    public void process(HttpRequest request, HttpContext context)
+            throws HttpException, IOException {
         HMACAuthorizationHeader authHeader = this.createHMACAuthorizationHeader();
 
         HMACMessageCreator messageCreator = new HMACMessageCreator();
@@ -103,10 +104,10 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         request.setHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION, authHeader.toString()); //set it with encrypted signature
 
         //set context for response interceptor
+        context.setAttribute("httpVerb", request.getRequestLine().getMethod().toUpperCase());
         context.setAttribute("authHeader", authHeader);
-        context.setAttribute(
-            "xAuthorizationTimestamp",
-            request.getFirstHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue());
+        context.setAttribute("xAuthorizationTimestamp", request.getFirstHeader(
+            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue());
     }
 
     /**
@@ -115,8 +116,8 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
      * @return
      */
     protected HMACAuthorizationHeader createHMACAuthorizationHeader() {
-        return new HMACAuthorizationHeader(this.realm, this.accessKey,
-            UUID.randomUUID().toString(), VERSION, this.customHeaders, /*signature*/null);
+        return new HMACAuthorizationHeader(this.realm, this.accessKey, UUID.randomUUID().toString(),
+            VERSION, this.customHeaders, /*signature*/null);
     }
 
 }

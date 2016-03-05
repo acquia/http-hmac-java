@@ -44,62 +44,75 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
     }
 
     @Override
-    public void process(HttpResponse response, HttpContext context) throws HttpException,
-            IOException {
-        //get server response signature
-        Header serverAuthResponseHeader = response.getFirstHeader(HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256);
-        if (serverAuthResponseHeader == null) {
-            throw new HttpException("Error: Server failed to provide response validation.");
-        }
-        String serverSignature = serverAuthResponseHeader.getValue();
-
-        //get nonce of when request was made
-        HMACAuthorizationHeader authHeader = (HMACAuthorizationHeader) context.getAttribute("authHeader");
-        if (authHeader == null) {
-            throw new HttpException("Error: No authHeader in the HTTP context.");
-        }
-        String nonce = authHeader.getNonce();
-
-        //get xAuthorizationTimestamp of when request was made
-        String xAuthorizationTimestamp = (String) context.getAttribute("xAuthorizationTimestamp");
-        if (xAuthorizationTimestamp == null) {
-            throw new HttpException("Error: No xAuthorizationTimestamp in the HTTP context.");
+    public void process(HttpResponse response, HttpContext context)
+            throws HttpException, IOException {
+        //get httpVerb
+        String httpVerb = (String) context.getAttribute("httpVerb");
+        if (httpVerb == null) {
+            throw new HttpException("Error: No httpVerb in the HTTP context.");
         }
 
-        //get server response body
-        String responseContent = "";
-        HttpEntity entity = response.getEntity();
-        if (entity != null && entity.getContentLength() > 0) {
-            StringBuilder respStringBuilder = new StringBuilder();
-            try {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(
-                    entity.getContent()), 1000);
-                String line = null;
-                while ((line = reader.readLine()) != null) {
-                    respStringBuilder.append(line);
-                }
-            } catch(IOException e) {
-                e.printStackTrace();
-            } catch(Exception e) {
-                e.printStackTrace();
+        //upon HEAD method, server will not append server validation header
+        if (!httpVerb.equals("HEAD")) {
+            //get server response signature
+            Header serverAuthResponseHeader = response.getFirstHeader(
+                HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256);
+            if (serverAuthResponseHeader == null) {
+                throw new HttpException("Error: Server failed to provide response validation.");
             }
-            responseContent = respStringBuilder.toString();
-        }
+            String serverSignature = serverAuthResponseHeader.getValue();
 
-        //check response validity
-        HMACMessageCreator messageCreator = new HMACMessageCreator();
-        String signableResponseMessage = messageCreator.createSignableResponseMessage(nonce,
-            xAuthorizationTimestamp, responseContent);
-        String signedResponseMessage = "";
-        try {
-            signedResponseMessage = this.algorithm.encryptMessage(this.secretKey,
-                signableResponseMessage);
-        } catch(SignatureException e) {
-            throw new IOException("Fail to sign response message", e);
-        }
+            //get nonce of when request was made
+            HMACAuthorizationHeader authHeader = (HMACAuthorizationHeader) context.getAttribute(
+                "authHeader");
+            if (authHeader == null) {
+                throw new HttpException("Error: No authHeader in the HTTP context.");
+            }
+            String nonce = authHeader.getNonce();
 
-        if (serverSignature.compareTo(signedResponseMessage) != 0) {
-            throw new HttpException("Error: Invalid server response validation.");
+            //get xAuthorizationTimestamp of when request was made
+            String xAuthorizationTimestamp = (String) context.getAttribute(
+                "xAuthorizationTimestamp");
+            if (xAuthorizationTimestamp == null) {
+                throw new HttpException("Error: No xAuthorizationTimestamp in the HTTP context.");
+            }
+
+            //get server response body
+            String responseContent = "";
+            HttpEntity entity = response.getEntity();
+            if (entity != null && entity.getContentLength() > 0) {
+                StringBuilder respStringBuilder = new StringBuilder();
+                try {
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(
+                        entity.getContent(), HMACMessageCreator.ENCODING_UTF_8), 1000);
+                    String line = null;
+                    while ((line = reader.readLine()) != null) {
+                        respStringBuilder.append(line);
+                    }
+                    reader.close();
+                } catch(IOException e) {
+                    e.printStackTrace();
+                } catch(Exception e) {
+                    e.printStackTrace();
+                }
+                responseContent = respStringBuilder.toString();
+            }
+
+            //check response validity
+            HMACMessageCreator messageCreator = new HMACMessageCreator();
+            String signableResponseMessage = messageCreator.createSignableResponseMessage(nonce,
+                xAuthorizationTimestamp, responseContent);
+            String signedResponseMessage = "";
+            try {
+                signedResponseMessage = this.algorithm.encryptMessage(this.secretKey,
+                    signableResponseMessage);
+            } catch(SignatureException e) {
+                throw new IOException("Fail to sign response message", e);
+            }
+
+            if (serverSignature.compareTo(signedResponseMessage) != 0) {
+                throw new HttpException("Error: Invalid server response validation.");
+            }
         }
     }
 
