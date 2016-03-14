@@ -1,8 +1,10 @@
 package com.acquia.http;
 
-import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.security.SignatureException;
 
 import org.apache.http.Header;
@@ -81,21 +83,58 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
             String responseContent = "";
             HttpEntity entity = response.getEntity();
             if (entity != null && entity.getContentLength() > 0) {
-                StringBuilder respStringBuilder = new StringBuilder();
-                try {
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(
-                        entity.getContent(), HMACMessageCreator.ENCODING_UTF_8), 1024);
-                    String line = null;
-                    while ((line = reader.readLine()) != null) {
-                        respStringBuilder.append(line);
+                //response body can only be consumed once - so copy this somewhere
+                ByteArrayOutputStream baos = HMACUtil.convertInputStreamIntoByteArrayOutputStream(
+                    entity.getContent());
+                responseContent = new String(baos.toByteArray(), HMACMessageCreator.ENCODING_UTF_8);
+
+                //set the entity again so it is ready for further consumption
+                response.setEntity(new HttpEntity() {
+                    @Override
+                    public boolean isRepeatable() {
+                        return entity.isRepeatable();
                     }
-                    reader.close();
-                } catch(IOException e) {
-                    e.printStackTrace();
-                } catch(Exception e) {
-                    e.printStackTrace();
-                }
-                responseContent = respStringBuilder.toString();
+
+                    @Override
+                    public boolean isChunked() {
+                        return entity.isChunked();
+                    }
+
+                    @Override
+                    public long getContentLength() {
+                        return entity.getContentLength();
+                    }
+
+                    @Override
+                    public Header getContentType() {
+                        return entity.getContentType();
+                    }
+
+                    @Override
+                    public Header getContentEncoding() {
+                        return entity.getContentEncoding();
+                    }
+
+                    @Override
+                    public InputStream getContent() throws IOException, IllegalStateException {
+                        return new ByteArrayInputStream(baos.toByteArray());
+                    }
+
+                    @Override
+                    public void writeTo(OutputStream outstream) throws IOException {
+                        entity.writeTo(outstream);
+                    }
+
+                    @Override
+                    public boolean isStreaming() {
+                        return entity.isStreaming();
+                    }
+
+                    @Override
+                    public void consumeContent() throws IOException {
+                        entity.consumeContent();
+                    }
+                });
             }
 
             //check response validity

@@ -1,6 +1,5 @@
 package com.acquia.http;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -286,34 +285,11 @@ public class HMACMessageCreator {
         }
 
         //calculate and check body hash
-        byte[] requestBodyBytes = this.convertInputStreamIntoBtyeArray(requestBody);
+        byte[] requestBodyBytes = HMACUtil.convertInputStreamIntoByteArrayOutputStream(
+            requestBody).toByteArray();
         byte[] encBody = DigestUtils.sha256(requestBodyBytes);
         String bodyHash = Base64.encodeBase64String(encBody); //v2 specification requires base64 encoded SHA-256
         return bodyHash.equals(xAuthorizationContentSha256);
-    }
-
-    /**
-     * Convert InputStream into byte[]
-     * 
-     * @param inputStream
-     * @return
-     * @throws IOException 
-     */
-    private byte[] convertInputStreamIntoBtyeArray(InputStream inputStream) throws IOException {
-        if (inputStream == null) {
-            return null;
-        }
-
-        byte[] byteChunk = new byte[1024];
-        int length = -1;
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        while ((length = inputStream.read(byteChunk)) != -1) {
-            baos.write(byteChunk, 0, length);
-        }
-        baos.flush();
-        baos.close();
-        return baos.toByteArray();
     }
 
     /**
