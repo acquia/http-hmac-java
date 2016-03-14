@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -239,7 +240,7 @@ public class HMACMessageCreator {
         result.append(httpVerb.toUpperCase()).append("\n");
         result.append(host.toLowerCase()).append("\n");
         result.append(path).append("\n");
-        result.append(queryParameters).append("\n");
+        result.append(URLDecoder.decode(queryParameters, ENCODING_UTF_8)).append("\n");
 
         //adding Authorization header parameters
         result.append("id=").append(authHeader.getId());
