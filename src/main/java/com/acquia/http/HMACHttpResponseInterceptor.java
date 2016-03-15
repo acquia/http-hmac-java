@@ -81,10 +81,10 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
 
             //get server response body
             String responseContent = "";
-            HttpEntity entity = response.getEntity();
+            final HttpEntity entity = response.getEntity();
             if (entity != null && entity.getContentLength() > 0) {
                 //response body can only be consumed once - so copy this somewhere
-                ByteArrayOutputStream baos = HMACUtil.convertInputStreamIntoByteArrayOutputStream(
+                final ByteArrayOutputStream baos = HMACUtil.convertInputStreamIntoByteArrayOutputStream(
                     entity.getContent());
                 responseContent = new String(baos.toByteArray(), HMACMessageCreator.ENCODING_UTF_8);
 

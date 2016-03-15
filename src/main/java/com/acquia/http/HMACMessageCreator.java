@@ -2,6 +2,7 @@ package com.acquia.http;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
@@ -243,11 +244,10 @@ public class HMACMessageCreator {
         result.append(URLDecoder.decode(queryParameters, ENCODING_UTF_8)).append("\n");
 
         //adding Authorization header parameters
-        result.append("id=").append(authHeader.getId());
-        result.append("&nonce=").append(authHeader.getNonce());
-        result.append("&realm=").append(
-            URLEncoder.encode(authHeader.getRealm(), ENCODING_UTF_8).replace("+", "%20"));
-        result.append("&version=").append(authHeader.getVersion());
+        result.append("id=").append(this.escapeProper(authHeader.getId()));
+        result.append("&nonce=").append(this.escapeProper(authHeader.getNonce()));
+        result.append("&realm=").append(this.escapeProper(authHeader.getRealm()));
+        result.append("&version=").append(this.escapeProper(authHeader.getVersion()));
         result.append("\n");
 
         //adding Authorization custom header parameters
@@ -268,6 +268,17 @@ public class HMACMessageCreator {
             result.append("\n").append(xAuthorizationContentSha256);
         }
         return result.toString();
+    }
+
+    /**
+     * Escape String with UTF-8 encoding
+     * 
+     * @param theString
+     * @return
+     * @throws UnsupportedEncodingException
+     */
+    private String escapeProper(String theString) throws UnsupportedEncodingException {
+        return URLEncoder.encode(theString, ENCODING_UTF_8).replace("+", "%20");
     }
 
     /**
