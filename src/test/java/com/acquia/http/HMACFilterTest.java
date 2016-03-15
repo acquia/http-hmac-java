@@ -1,11 +1,14 @@
 package com.acquia.http;
 
 import static org.junit.Assert.assertEquals;
+import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -60,8 +63,9 @@ public class HMACFilterTest {
 
         String signature = "4VtBHjqrdDeYrJySoJVDUHpN9u3vyTsyOLz4chezi98=";
 
-        HMACAuthorizationHeader authHeader = new HMACAuthorizationHeader(realm, id, nonce, version, /*headers*/
-        null, signature);
+        HMACAuthorizationHeader authHeader = new HMACAuthorizationHeader(realm, id, nonce,
+            version, /*headers*/
+            null, signature);
 
         final ByteArrayInputStream realInputStream = new ByteArrayInputStream(reqBody.getBytes());
         ServletInputStream requestInputStream = new ServletInputStream() {
@@ -74,10 +78,12 @@ public class HMACFilterTest {
         this.request = mock(HttpServletRequest.class);
         when(this.request.getHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION)).thenReturn(
             authHeader.toString());
-        when(this.request.getHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP)).thenReturn(
-            xAuthorizationTimestamp);
-        when(this.request.getHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_CONTENT_SHA256)).thenReturn(
-            xAuthorizationContentSha256);
+        when(this.request.getHeader(
+            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP)).thenReturn(
+                xAuthorizationTimestamp);
+        when(this.request.getHeader(
+            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_CONTENT_SHA256)).thenReturn(
+                xAuthorizationContentSha256);
 
         when(this.request.getMethod()).thenReturn(httpMethod);
         when(this.request.getServerName()).thenReturn("54.154.147.142:3000");
@@ -107,7 +113,8 @@ public class HMACFilterTest {
                 Object[] args = invocation.getArguments();
                 String headerKey = (String) args[0];
                 String valueKey = (String) args[1];
-                if (HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256.equals(headerKey)) {
+                if (HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256.equals(
+                    headerKey)) {
                     serverResponseValidationHeader.append(valueKey);
                 }
                 return null;
@@ -128,7 +135,7 @@ public class HMACFilterTest {
             (HttpServletResponse) anyObject());
 
         //test the filter
-        HMACFilter testFilter = new HMACFilter() {
+        HMACFilter filter = new HMACFilter() {
             @Override
             protected String getSecretKey(String accessKey) {
                 if (id.equals(accessKey)) {
@@ -137,6 +144,8 @@ public class HMACFilterTest {
                 return null;
             }
         };
+        HMACFilter testFilter = spy(filter);
+        doReturn(0).when(testFilter).compareTimestampWithinTolerance(anyLong());
         testFilter.init(this.filterConfig);
         testFilter.doFilter(this.request, response, filterChain);
 
@@ -152,7 +161,7 @@ public class HMACFilterTest {
         FilterChain filterChain = mock(FilterChain.class);
 
         //test filter
-        HMACFilter testFilter = new HMACFilter() {
+        HMACFilter filter = new HMACFilter() {
             @Override
             protected String getSecretKey(String accessKey) {
                 if (id.equals(accessKey)) {
@@ -161,6 +170,8 @@ public class HMACFilterTest {
                 return null;
             }
         };
+        HMACFilter testFilter = spy(filter);
+        doReturn(0).when(testFilter).compareTimestampWithinTolerance(anyLong());
         testFilter.init(this.filterConfig);
         testFilter.doFilter(this.request, response, filterChain);
 

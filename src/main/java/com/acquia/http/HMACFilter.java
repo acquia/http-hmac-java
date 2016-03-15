@@ -46,10 +46,33 @@ public abstract class HMACFilter implements Filter {
             HttpServletResponse httpResponse = (HttpServletResponse) response;
             CharResponseWrapper wrappedResponse = new CharResponseWrapper(httpResponse);
 
-            String authorization = httpRequest.getHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION);
-            String xAuthorizationTimestamp = httpRequest.getHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
+            //check timestamp
+            String xAuthorizationTimestamp = httpRequest.getHeader(
+                HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
+            if (xAuthorizationTimestamp != null) {
+                int timestampStatus = this.compareTimestampWithinTolerance(
+                    Long.parseLong(xAuthorizationTimestamp));
+                if (timestampStatus > 0) {
+                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                        "Error: X-Authorization-Timestamp is too far in the future.");
+                    return;
+                } else if (timestampStatus < 0) {
+                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                        "Error: X-Authorization-Timestamp is too far in the past.");
+                    return;
+                }
+            } else {
+                httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                    "Error: X-Authorization-Timestamp is required.");
+                return;
+            }
+
+            //check authorization
+            String authorization = httpRequest.getHeader(
+                HMACMessageCreator.PARAMETER_AUTHORIZATION);
             if (authorization != null) {
-                HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
+                HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
+                    authorization);
 
                 String accessKey = authHeader.getId();
                 String nonce = authHeader.getNonce();
@@ -59,7 +82,8 @@ public abstract class HMACFilter implements Filter {
 
                 //check request validity
                 HMACMessageCreator messageCreator = new HMACMessageCreator();
-                String signableRequestMessage = messageCreator.createSignableRequestMessage(httpRequest);
+                String signableRequestMessage = messageCreator.createSignableRequestMessage(
+                    httpRequest);
                 String signedRequestMessage = "";
                 try {
                     signedRequestMessage = this.algorithm.encryptMessage(secretKey,
@@ -79,8 +103,8 @@ public abstract class HMACFilter implements Filter {
 
                 //set response validation header
                 String responseContent = wrappedResponse.toString();
-                String signableResponseMessage = messageCreator.createSignableResponseMessage(
-                    nonce, xAuthorizationTimestamp, responseContent);
+                String signableResponseMessage = messageCreator.createSignableResponseMessage(nonce,
+                    xAuthorizationTimestamp, responseContent);
                 String signedResponseMessage = "";
                 try {
                     signedResponseMessage = this.algorithm.encryptMessage(secretKey,
@@ -92,17 +116,35 @@ public abstract class HMACFilter implements Filter {
                     HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256,
                     signedResponseMessage);
                 httpResponse.getOutputStream().write(wrappedResponse.getByteArray()); //write back the response
+            } else {
+                httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                    "Error: Authorization is required.");
+                return;
             }
-
-            httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                "Error: No authentication credentials were found.");
-            return;
         }
     }
 
     @Override
     public void destroy() {
 
+    }
+
+    /**
+     * Check if timestamp is within tolerance (900 seconds)
+     * 
+     * @param unixTimestamp
+     * @return non-zero if timestamp is outside tolerance (positive if in the future; negative in the past); otherwise return zero
+     */
+    public int compareTimestampWithinTolerance(long unixTimestamp) {
+        long tolerance = 900;
+        long unixCurrent = System.currentTimeMillis() / 1000L;
+        if (unixTimestamp > unixCurrent + tolerance) {
+            return 1;
+        } else if (unixTimestamp < unixCurrent - tolerance) {
+            return -1;
+        } else {
+            return 0;
+        }
     }
 
     /** 

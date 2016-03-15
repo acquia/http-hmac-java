@@ -39,8 +39,8 @@ public abstract class HMACHttpServlet extends HttpServlet {
     }
 
     @Override
-    public void service(ServletRequest request, ServletResponse response) throws ServletException,
-            IOException {
+    public void service(ServletRequest request, ServletResponse response)
+            throws ServletException, IOException {
         //upon entry
         this.validateRequestAuthorization(request, response);
 
@@ -64,9 +64,33 @@ public abstract class HMACHttpServlet extends HttpServlet {
             HttpServletRequest httpRequest = (HttpServletRequest) request;
             HttpServletResponse httpResponse = (HttpServletResponse) response;
 
-            String authorization = httpRequest.getHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION);
+            //check timestamp
+            String xAuthorizationTimestamp = httpRequest.getHeader(
+                HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
+            if (xAuthorizationTimestamp != null) {
+                int timestampStatus = HMACUtil.compareTimestampWithinTolerance(
+                    Long.parseLong(xAuthorizationTimestamp));
+                if (timestampStatus > 0) {
+                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                        "Error: X-Authorization-Timestamp is too far in the future.");
+                    return;
+                } else if (timestampStatus < 0) {
+                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                        "Error: X-Authorization-Timestamp is too far in the past.");
+                    return;
+                }
+            } else {
+                httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                    "Error: X-Authorization-Timestamp is required.");
+                return;
+            }
+
+            //check authorization
+            String authorization = httpRequest.getHeader(
+                HMACMessageCreator.PARAMETER_AUTHORIZATION);
             if (authorization != null) {
-                HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
+                HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
+                    authorization);
 
                 String accessKey = authHeader.getId();
                 String signature = authHeader.getSignature();
@@ -75,7 +99,8 @@ public abstract class HMACHttpServlet extends HttpServlet {
 
                 //check request validity
                 HMACMessageCreator messageCreator = new HMACMessageCreator();
-                String signableRequestMessage = messageCreator.createSignableRequestMessage(httpRequest);
+                String signableRequestMessage = messageCreator.createSignableRequestMessage(
+                    httpRequest);
                 String signedRequestMessage = "";
                 try {
                     signedRequestMessage = this.algorithm.encryptMessage(secretKey,
@@ -89,11 +114,11 @@ public abstract class HMACHttpServlet extends HttpServlet {
                         "Error: Invalid authentication token.");
                     return;
                 }
+            } else {
+                httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                    "Error: Authorization is required.");
+                return;
             }
-
-            httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                "Error: No authentication credentials were found.");
-            return;
         }
     }
 
@@ -111,10 +136,13 @@ public abstract class HMACHttpServlet extends HttpServlet {
             HttpServletResponse httpResponse = (HttpServletResponse) response;
             CharResponseWrapper wrappedResponse = new CharResponseWrapper(httpResponse);
 
-            String authorization = httpRequest.getHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION);
-            String xAuthorizationTimestamp = httpRequest.getHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
+            String xAuthorizationTimestamp = httpRequest.getHeader(
+                HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
+            String authorization = httpRequest.getHeader(
+                HMACMessageCreator.PARAMETER_AUTHORIZATION);
             if (authorization != null) {
-                HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
+                HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
+                    authorization);
 
                 String accessKey = authHeader.getId();
                 String nonce = authHeader.getNonce();
@@ -137,11 +165,10 @@ public abstract class HMACHttpServlet extends HttpServlet {
                     HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256,
                     signedResponseMessage);
                 httpResponse.getOutputStream().write(wrappedResponse.getByteArray()); //write back the response
+            } else {
+                httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                    "Error: Authorization is required.");
             }
-
-            httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                "Error: No authentication credentials were found.");
-            return;
         }
     }
 
