@@ -1,11 +1,14 @@
 package com.acquia.http;
 
+import static org.mockito.Matchers.anyObject;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
@@ -13,6 +16,8 @@ import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
 import org.apache.http.protocol.HttpContext;
 import org.junit.Test;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 public class HMACHttpResponseInterceptorTest {
 
@@ -36,7 +41,7 @@ public class HMACHttpResponseInterceptorTest {
         HttpResponse response = mock(HttpResponse.class);
 
         final ByteArrayInputStream realInputStream = new ByteArrayInputStream(respBody.getBytes());
-        InputStream responseInputStream = new InputStream() {
+        final InputStream responseInputStream = new InputStream() {
             @Override
             public int read() {
                 return realInputStream.read();
@@ -46,6 +51,20 @@ public class HMACHttpResponseInterceptorTest {
         when(responseEntity.getContentLength()).thenReturn(
             Long.parseLong(respBody.getBytes(HMACMessageCreator.ENCODING_UTF_8).length + ""));
         when(responseEntity.getContent()).thenReturn(responseInputStream);
+        doAnswer(new Answer<Void>() {
+            public Void answer(InvocationOnMock invocation) throws IOException {
+                Object[] args = invocation.getArguments();
+                OutputStream os = (OutputStream) args[0];
+                byte[] byteChunk = new byte[1024];
+                int length = -1;
+                while ((length = responseInputStream.read(byteChunk)) != -1) {
+                    os.write(byteChunk, 0, length);
+                }
+                os.flush();
+                os.close();
+                return null;
+            }
+        }).when(responseEntity).writeTo((OutputStream) anyObject());
         when(response.getEntity()).thenReturn(responseEntity);
 
         Header xServerAuthorizationHmacSha256Header = mockHeader(
@@ -56,10 +75,13 @@ public class HMACHttpResponseInterceptorTest {
 
         //mock context
         HttpContext context = mock(HttpContext.class);
-        when(context.getAttribute("httpVerb")).thenReturn(httpMethod);
-        when(context.getAttribute("authHeader")).thenReturn(
+        when(context.getAttribute(HMACHttpRequestInterceptor.CONTEXT_HTTP_VERB)).thenReturn(
+            httpMethod);
+        when(context.getAttribute(HMACHttpRequestInterceptor.CONTEXT_AUTH_HEADER)).thenReturn(
             new HMACAuthorizationHeader(realm, id, nonce, version));
-        when(context.getAttribute("xAuthorizationTimestamp")).thenReturn(xAuthorizationTimestamp);
+        when(context.getAttribute(
+            HMACHttpRequestInterceptor.CONTEXT_X_AUTHORIZATION_TIMESTAMP)).thenReturn(
+                xAuthorizationTimestamp);
 
         //test response interceptor
         HMACHttpResponseInterceptor responseInterceptor = new HMACHttpResponseInterceptor(secretKey,

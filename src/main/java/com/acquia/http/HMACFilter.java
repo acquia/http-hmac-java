@@ -135,7 +135,7 @@ public abstract class HMACFilter implements Filter {
      * @param unixTimestamp
      * @return non-zero if timestamp is outside tolerance (positive if in the future; negative in the past); otherwise return zero
      */
-    public int compareTimestampWithinTolerance(long unixTimestamp) {
+    protected int compareTimestampWithinTolerance(long unixTimestamp) {
         long tolerance = 900;
         long unixCurrent = System.currentTimeMillis() / 1000L;
         if (unixTimestamp > unixCurrent + tolerance) {

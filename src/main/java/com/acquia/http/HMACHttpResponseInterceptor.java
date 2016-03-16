@@ -49,7 +49,8 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
     public void process(HttpResponse response, HttpContext context)
             throws HttpException, IOException {
         //get httpVerb
-        String httpVerb = (String) context.getAttribute("httpVerb");
+        String httpVerb = (String) context.getAttribute(
+            HMACHttpRequestInterceptor.CONTEXT_HTTP_VERB);
         if (httpVerb == null) {
             throw new HttpException("Error: No httpVerb in the HTTP context.");
         }
@@ -66,7 +67,7 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
 
             //get nonce of when request was made
             HMACAuthorizationHeader authHeader = (HMACAuthorizationHeader) context.getAttribute(
-                "authHeader");
+                HMACHttpRequestInterceptor.CONTEXT_AUTH_HEADER);
             if (authHeader == null) {
                 throw new HttpException("Error: No authHeader in the HTTP context.");
             }
@@ -74,7 +75,7 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
 
             //get xAuthorizationTimestamp of when request was made
             String xAuthorizationTimestamp = (String) context.getAttribute(
-                "xAuthorizationTimestamp");
+                HMACHttpRequestInterceptor.CONTEXT_X_AUTHORIZATION_TIMESTAMP);
             if (xAuthorizationTimestamp == null) {
                 throw new HttpException("Error: No xAuthorizationTimestamp in the HTTP context.");
             }
@@ -84,9 +85,11 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
             final HttpEntity entity = response.getEntity();
             if (entity != null && entity.getContentLength() > 0) {
                 //response body can only be consumed once - so copy this somewhere
-                final ByteArrayOutputStream baos = HMACUtil.convertInputStreamIntoByteArrayOutputStream(
-                    entity.getContent());
-                responseContent = new String(baos.toByteArray(), HMACMessageCreator.ENCODING_UTF_8);
+                final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                entity.writeTo(baos);
+                baos.flush();
+                baos.close();
+                responseContent = baos.toString(HMACMessageCreator.ENCODING_UTF_8);
 
                 //set the entity again so it is ready for further consumption
                 response.setEntity(new HttpEntity() {

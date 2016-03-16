@@ -1,5 +1,6 @@
 package com.acquia.http;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -50,7 +51,7 @@ public class HMACMessageCreator {
     }
 
     /**
-     * Create response signature message
+     * Create request signature message from HTTP request
      * 
      * @param request HTTP request
      * @return The message to be encrypted
@@ -111,7 +112,7 @@ public class HMACMessageCreator {
     }
 
     /**
-     * Create response signature message
+     * Create request signature message from HTTP request
      * 
      * @param request; HTTP request
      * @param authHeader; specify authHeader
@@ -213,7 +214,7 @@ public class HMACMessageCreator {
     }
 
     /**
-     * Helper method to create request signature message
+     * Helper method to create request signature message from HTTP request attributes
      * 
      * @param httpVerb; HTTP request method (GET, POST, etc)
      * @param host; HTTP "Host" request header field (including any port number)
@@ -264,8 +265,12 @@ public class HMACMessageCreator {
 
         //adding more if needed
         if (this.isPassingRequestBody(contentLength, xAuthorizationContentSha256, requestBody)) {
-            result.append("\n").append(contentType.toLowerCase());
-            result.append("\n").append(xAuthorizationContentSha256);
+            if (this.isValidRequestBody(xAuthorizationContentSha256, requestBody)) {
+                result.append("\n").append(contentType.toLowerCase());
+                result.append("\n").append(xAuthorizationContentSha256);
+            } else {
+                //FIXME: throw error?
+            }
         }
         return result.toString();
     }
@@ -282,10 +287,11 @@ public class HMACMessageCreator {
     }
 
     /**
-     * Method to help check if requestBody needs to be passed or can be omitted
+     * Method to help check if requestBody is properly passed or not
      * 
-     * @param xAuthorizationContentSha256
      * @param contentLength
+     * @param xAuthorizationContentSha256
+     * @param requestBody
      * @return
      * @throws IOException 
      */
@@ -295,17 +301,71 @@ public class HMACMessageCreator {
                 || xAuthorizationContentSha256.length() <= 0 || requestBody == null) {
             return false;
         }
+        return true;
+    }
+
+    /**
+     * Method to help check if requestBody has the same hash as specified
+     * 
+     * @param xAuthorizationContentSha256
+     * @param requestBody
+     * @return
+     * @throws IOException 
+     */
+    private boolean isValidRequestBody(String xAuthorizationContentSha256, InputStream requestBody)
+            throws IOException {
+        if (xAuthorizationContentSha256 == null || xAuthorizationContentSha256.length() <= 0
+                || requestBody == null) {
+            return false;
+        }
 
         //calculate and check body hash
-        byte[] requestBodyBytes = HMACUtil.convertInputStreamIntoByteArrayOutputStream(
-            requestBody).toByteArray();
-        byte[] encBody = DigestUtils.sha256(requestBodyBytes);
-        String bodyHash = Base64.encodeBase64String(encBody); //v2 specification requires base64 encoded SHA-256
+        String bodyHash = this.getBase64Sha256String(requestBody); //v2 specification requires base64 encoded SHA-256
         return bodyHash.equals(xAuthorizationContentSha256);
     }
 
     /**
-     * Create response signature message
+     * Get base64 encoded SHA-256 of an inputStream
+     * 
+     * @param inputStream
+     * @return
+     * @throws IOException
+     */
+    private String getBase64Sha256String(InputStream inputStream) throws IOException {
+        byte[] inputStreamBytes = this.convertInputStreamIntoByteArrayOutputStream(
+            inputStream).toByteArray();
+        byte[] encBody = DigestUtils.sha256(inputStreamBytes);
+        String bodyHash = Base64.encodeBase64String(encBody);
+        return bodyHash;
+    }
+
+    /**
+     * Convert InputStream into byte[]
+     * 
+     * @param inputStream
+     * @return
+     * @throws IOException 
+     */
+    private ByteArrayOutputStream convertInputStreamIntoByteArrayOutputStream(
+            InputStream inputStream) throws IOException {
+        if (inputStream == null) {
+            return null;
+        }
+
+        byte[] byteChunk = new byte[1024];
+        int length = -1;
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        while ((length = inputStream.read(byteChunk)) != -1) {
+            baos.write(byteChunk, 0, length);
+        }
+        baos.flush();
+        baos.close();
+        return baos;
+    }
+
+    /**
+     * Create response signature message from HTTP response attributes
      * 
      * @param nonce
      * @param xAuthorizationTimestamp

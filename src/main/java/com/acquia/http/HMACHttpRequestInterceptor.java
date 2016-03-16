@@ -20,7 +20,11 @@ import org.apache.http.protocol.HttpContext;
  */
 public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
 
-    private static final String VERSION = "2.0";
+    public static final String CONTEXT_HTTP_VERB = "httpVerb";
+    public static final String CONTEXT_AUTH_HEADER = "authHeader";
+    public static final String CONTEXT_X_AUTHORIZATION_TIMESTAMP = "xAuthorizationTimestamp";
+
+    public static final String VERSION = "2.0";
 
     /**
      * The Authorization provider
@@ -104,9 +108,9 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         request.setHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION, authHeader.toString()); //set it with encrypted signature
 
         //set context for response interceptor
-        context.setAttribute("httpVerb", request.getRequestLine().getMethod().toUpperCase());
-        context.setAttribute("authHeader", authHeader);
-        context.setAttribute("xAuthorizationTimestamp", request.getFirstHeader(
+        context.setAttribute(CONTEXT_HTTP_VERB, request.getRequestLine().getMethod().toUpperCase());
+        context.setAttribute(CONTEXT_AUTH_HEADER, authHeader);
+        context.setAttribute(CONTEXT_X_AUTHORIZATION_TIMESTAMP, request.getFirstHeader(
             HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue());
     }
 

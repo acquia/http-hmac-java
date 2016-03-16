@@ -68,7 +68,7 @@ public abstract class HMACHttpServlet extends HttpServlet {
             String xAuthorizationTimestamp = httpRequest.getHeader(
                 HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
             if (xAuthorizationTimestamp != null) {
-                int timestampStatus = HMACUtil.compareTimestampWithinTolerance(
+                int timestampStatus = this.compareTimestampWithinTolerance(
                     Long.parseLong(xAuthorizationTimestamp));
                 if (timestampStatus > 0) {
                     httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
@@ -119,6 +119,24 @@ public abstract class HMACHttpServlet extends HttpServlet {
                     "Error: Authorization is required.");
                 return;
             }
+        }
+    }
+
+    /**
+     * Check if timestamp is within tolerance (900 seconds)
+     * 
+     * @param unixTimestamp
+     * @return non-zero if timestamp is outside tolerance (positive if in the future; negative in the past); otherwise return zero
+     */
+    protected int compareTimestampWithinTolerance(long unixTimestamp) {
+        long tolerance = 900;
+        long unixCurrent = System.currentTimeMillis() / 1000L;
+        if (unixTimestamp > unixCurrent + tolerance) {
+            return 1;
+        } else if (unixTimestamp < unixCurrent - tolerance) {
+            return -1;
+        } else {
+            return 0;
         }
     }
 

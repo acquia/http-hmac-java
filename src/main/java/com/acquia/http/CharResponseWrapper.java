@@ -65,7 +65,7 @@ public class CharResponseWrapper extends HttpServletResponseWrapper {
         public String toString() {
             String result = "";
             try {
-                result = new String(baos.toByteArray(), ENCODING_UTF_8);
+                result = baos.toString(ENCODING_UTF_8);
             } catch(UnsupportedEncodingException e) {
                 e.printStackTrace();
             }
