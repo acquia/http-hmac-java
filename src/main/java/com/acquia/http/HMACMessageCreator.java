@@ -3,8 +3,10 @@ package com.acquia.http;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -19,6 +21,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
+import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 
 /**
@@ -29,13 +32,17 @@ import org.apache.http.HttpRequest;
  */
 public class HMACMessageCreator {
 
-    private static final String ENCODING_UTF_8 = "UTF-8";
+    public static final String ENCODING_UTF_8 = "UTF-8";
 
-    private static final String PARAMETER_AUTHORIZATION = "Authorization";
-    private static final String PARAMETER_X_AUTHORIZATION_TIMESTAMP = "X-Authorization-Timestamp";
-    private static final String PARAMETER_CONTENT_TYPE = "Content-Type";
+    public static final String PARAMETER_AUTHORIZATION = "Authorization";
+    public static final String PARAMETER_X_AUTHORIZATION_TIMESTAMP = "X-Authorization-Timestamp";
+    public static final String PARAMETER_X_AUTHORIZATION_CONTENT_SHA256 = "X-Authorization-Content-SHA256";
+    public static final String PARAMETER_CONTENT_LENGTH = "Content-Length";
+    public static final String PARAMETER_CONTENT_TYPE = "Content-Type";
 
-    private static final String PARAMETER_HOST = "Host";
+    public static final String PARAMETER_HOST = "Host";
+
+    public static final String PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256 = "X-Server-Authorization-HMAC-SHA256";
 
     /**
      * Constructor
@@ -45,13 +52,13 @@ public class HMACMessageCreator {
     }
 
     /**
-     * Create the message based on the given HTTP request received and list of custom headers.
+     * Create request signature message from HTTP request
      * 
      * @param request HTTP request
      * @return The message to be encrypted
      * @throws IOException if bodyHash cannot be created
      */
-    public String createMessage(HttpServletRequest request) throws IOException {
+    public String createSignableRequestMessage(HttpServletRequest request) throws IOException {
         String httpVerb = request.getMethod().toUpperCase();
 
         int port = request.getServerPort();
@@ -63,18 +70,26 @@ public class HMACMessageCreator {
         }
 
         String authorization = request.getHeader(PARAMETER_AUTHORIZATION);
-        HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
+        HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
+            authorization);
+        if (authHeader == null) {
+            throw new IOException(
+                "Error: Invalid authHeader; one or more required attributes are not set.");
+        }
 
         Map<String, String> authorizationCustomHeaderParameterMap = this.getCustomHeaderMap(
             authHeader, request);
 
         String xAuthorizationTimestamp = request.getHeader(PARAMETER_X_AUTHORIZATION_TIMESTAMP);
+        int contentLength = request.getContentLength();
         String contentType = request.getContentType();
+        String xAuthorizationContentSha256 = request.getHeader(
+            PARAMETER_X_AUTHORIZATION_CONTENT_SHA256);
         InputStream requestBody = request.getInputStream();
 
-        return this.createMessage(httpVerb, host, path, queryParameters, authHeader,
-            authorizationCustomHeaderParameterMap, xAuthorizationTimestamp, contentType,
-            requestBody);
+        return this.createSignableRequestMessage(httpVerb, host, path, queryParameters, authHeader,
+            authorizationCustomHeaderParameterMap, xAuthorizationTimestamp, contentLength,
+            contentType, xAuthorizationContentSha256, requestBody);
     }
 
     /**
@@ -83,17 +98,19 @@ public class HMACMessageCreator {
      * 
      * @param authHeader
      * @param request
-     * @return
+     * @return 
+     * @throws IOException
      */
     private Map<String, String> getCustomHeaderMap(HMACAuthorizationHeader authHeader,
-            HttpServletRequest request) {
+            HttpServletRequest request) throws IOException {
         Map<String, String> theMap = new HashMap<String, String>();
         List<String> customHeaders = authHeader.getHeaders();
         if (customHeaders != null && customHeaders.size() > 0) {
             for (String headerName : customHeaders) {
                 String headerValue = request.getHeader(headerName);
                 if (headerValue == null) {
-                    continue; //FIXME: throw error? custom parameter cannot be found
+                    throw new IOException("Error: Custom header \"" + headerName
+                            + "\" cannot be found in the HTTP request.");
                 }
                 theMap.put(headerName.toLowerCase(), headerValue);
             }
@@ -102,15 +119,16 @@ public class HMACMessageCreator {
     }
 
     /**
-     * Create the message based on the given HTTP request to be sent and the list of custom header names.
+     * Create request signature message from HTTP request
      * 
      * @param request; HTTP request
      * @param authHeader; specify authHeader
      * @return The message to be encrypted
+     * @throws HttpException
      * @throws IOException if bodyHash cannot be created
      */
-    protected String createMessage(HttpRequest request, HMACAuthorizationHeader authHeader)
-            throws IOException {
+    protected String createSignableRequestMessage(HttpRequest request,
+            HMACAuthorizationHeader authHeader) throws HttpException, IOException {
         String httpVerb = request.getRequestLine().getMethod().toUpperCase();
 
         String host = request.getFirstHeader(PARAMETER_HOST).getValue();
@@ -124,19 +142,31 @@ public class HMACMessageCreator {
                 queryParameters = "";
             }
         } catch(URISyntaxException e) {
-            throw new IOException("Invalid URI", e);
+            throw new HttpException("Error: Invalid URI.", e);
         }
 
         //if authHeader is not set, try setting it from request
         if (authHeader == null) {
             String authorization = request.getFirstHeader(PARAMETER_AUTHORIZATION).getValue();
             authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
+            if (authHeader == null) {
+                throw new HttpException(
+                    "Error: Invalid authHeader; one or more required attributes are not set.");
+            }
         }
 
         Map<String, String> authorizationCustomHeaderParameterMap = this.getCustomHeaderMap(
             authHeader, request);
 
-        String xAuthorizationTimestamp = request.getFirstHeader(PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue();
+        String xAuthorizationTimestamp = request.getFirstHeader(
+            PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue();
+
+        //optional content length
+        Header contentLengthHeader = request.getFirstHeader(PARAMETER_CONTENT_LENGTH);
+        int contentLength = 0;
+        if (contentLengthHeader != null) {
+            contentLength = Integer.parseInt(contentLengthHeader.getValue());
+        }
 
         //optional content type
         Header contentTypeHeader = request.getFirstHeader(PARAMETER_CONTENT_TYPE);
@@ -145,16 +175,30 @@ public class HMACMessageCreator {
             contentType = contentTypeHeader.getValue();
         }
 
+        //optional authorization content sha256
+        Header xAuthorizationContentSha256Header = request.getFirstHeader(
+            PARAMETER_X_AUTHORIZATION_CONTENT_SHA256);
+        String xAuthorizationContentSha256 = "";
+        if (xAuthorizationContentSha256Header != null) {
+            xAuthorizationContentSha256 = xAuthorizationContentSha256Header.getValue();
+        }
+
         //optional request body
         InputStream requestBody = null;
         if (request instanceof HttpEntityEnclosingRequest) {
             HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
-            requestBody = entity.getContent();
+            if (entity != null) {
+                requestBody = entity.getContent();
+                //if contentLength is still 0, try setting it from entity
+                if (contentLength == 0) {
+                    contentLength = (int) entity.getContentLength();
+                }
+            }
         }
 
-        return this.createMessage(httpVerb, host, path, queryParameters, authHeader,
-            authorizationCustomHeaderParameterMap, xAuthorizationTimestamp, contentType,
-            requestBody);
+        return this.createSignableRequestMessage(httpVerb, host, path, queryParameters, authHeader,
+            authorizationCustomHeaderParameterMap, xAuthorizationTimestamp, contentLength,
+            contentType, xAuthorizationContentSha256, requestBody);
     }
 
     /**
@@ -164,16 +208,18 @@ public class HMACMessageCreator {
      * @param authHeader
      * @param request
      * @return
+     * @throws HttpException 
      */
     private Map<String, String> getCustomHeaderMap(HMACAuthorizationHeader authHeader,
-            HttpRequest request) {
+            HttpRequest request) throws HttpException {
         Map<String, String> theMap = new HashMap<String, String>();
         List<String> customHeaders = authHeader.getHeaders();
         if (customHeaders != null && customHeaders.size() > 0) {
             for (String headerName : customHeaders) {
                 Header customHeader = request.getFirstHeader(headerName);
                 if (customHeader == null) {
-                    continue; //FIXME: throw error? custom parameter cannot be found
+                    throw new HttpException("Error: Custom header \"" + headerName
+                            + "\" cannot be found in the HTTP request.");
                 }
                 theMap.put(headerName.toLowerCase(), customHeader.getValue());
             }
@@ -182,7 +228,7 @@ public class HMACMessageCreator {
     }
 
     /**
-     * Create the message based on the given components of the request.
+     * Helper method to create request signature message from HTTP request attributes
      * 
      * @param httpVerb; HTTP request method (GET, POST, etc)
      * @param host; HTTP "Host" request header field (including any port number)
@@ -191,16 +237,18 @@ public class HMACMessageCreator {
      * @param authHeader; Authorization header that contains essential header information
      * @param authorizationCustomHeaderParameterMap; Map (key, value) of Authorization header for: "headers" - other custom signed headers
      * @param xAuthorizationTimestamp; value of X-Authorization-Timestamp header
+     * @param contentLength; length of request body
      * @param contentType; value of Content-Type header
+     * @param xAuthorizationContentSha256; encrypted body hash for request body
      * @param requestBody; request body
      * @return The message to be encrypted
      * @throws IOException if bodyHash cannot be created
      */
-    private String createMessage(String httpVerb, String host, String path, String queryParameters,
-            HMACAuthorizationHeader authHeader,
+    private String createSignableRequestMessage(String httpVerb, String host, String path,
+            String queryParameters, HMACAuthorizationHeader authHeader,
             Map<String, String> authorizationCustomHeaderParameterMap,
-            String xAuthorizationTimestamp, String contentType, InputStream requestBody)
-            throws IOException {
+            String xAuthorizationTimestamp, int contentLength, String contentType,
+            String xAuthorizationContentSha256, InputStream requestBody) throws IOException {
 
         StringBuilder result = new StringBuilder();
 
@@ -208,14 +256,13 @@ public class HMACMessageCreator {
         result.append(httpVerb.toUpperCase()).append("\n");
         result.append(host.toLowerCase()).append("\n");
         result.append(path).append("\n");
-        result.append(queryParameters).append("\n");
+        result.append(URLDecoder.decode(queryParameters, ENCODING_UTF_8)).append("\n");
 
         //adding Authorization header parameters
-        result.append("id=").append(authHeader.getId());
-        result.append("&nonce=").append(authHeader.getNonce());
-        result.append("&realm=").append(
-            URLEncoder.encode(authHeader.getRealm(), ENCODING_UTF_8).replace("+", "%20"));
-        result.append("&version=").append(authHeader.getVersion());
+        result.append("id=").append(this.escapeProper(authHeader.getId()));
+        result.append("&nonce=").append(this.escapeProper(authHeader.getNonce()));
+        result.append("&realm=").append(this.escapeProper(authHeader.getRealm()));
+        result.append("&version=").append(this.escapeProper(authHeader.getVersion()));
         result.append("\n");
 
         //adding Authorization custom header parameters
@@ -231,16 +278,79 @@ public class HMACMessageCreator {
         result.append(xAuthorizationTimestamp);
 
         //adding more if needed
-        byte[] requestBodyBytes = this.convertInputStreamIntoBtyeArray(requestBody);
-        if (this.isPassingRequestBody(httpVerb, requestBodyBytes)) {
-            result.append("\n").append(contentType.toLowerCase());
-
-            //calculate body hash
-            byte[] encBody = DigestUtils.sha256(requestBodyBytes);
-            String bodyHash = Base64.encodeBase64String(encBody); //v2 specification requires base64 encoded SHA-256
-            result.append("\n").append(bodyHash);
+        if (this.isPassingRequestBody(contentLength, xAuthorizationContentSha256, requestBody)) {
+            if (this.isValidRequestBody(xAuthorizationContentSha256, requestBody)) {
+                result.append("\n").append(contentType.toLowerCase());
+                result.append("\n").append(xAuthorizationContentSha256);
+            } else {
+                throw new IOException(
+                    "Error: Request body does not have the same hash as X-Authorization-Content-Sha256 header.");
+            }
         }
         return result.toString();
+    }
+
+    /**
+     * Escape String with UTF-8 encoding
+     * 
+     * @param theString
+     * @return
+     * @throws UnsupportedEncodingException
+     */
+    private String escapeProper(String theString) throws UnsupportedEncodingException {
+        return URLEncoder.encode(theString, ENCODING_UTF_8).replace("+", "%20");
+    }
+
+    /**
+     * Method to help check if requestBody is properly passed or not
+     * 
+     * @param contentLength
+     * @param xAuthorizationContentSha256
+     * @param requestBody
+     * @return
+     */
+    private boolean isPassingRequestBody(int contentLength, String xAuthorizationContentSha256,
+            InputStream requestBody) {
+        if (contentLength <= 0 || xAuthorizationContentSha256 == null
+                || xAuthorizationContentSha256.length() <= 0 || requestBody == null) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Method to help check if requestBody has the same hash as specified
+     * 
+     * @param xAuthorizationContentSha256
+     * @param requestBody
+     * @return
+     * @throws IOException 
+     */
+    private boolean isValidRequestBody(String xAuthorizationContentSha256, InputStream requestBody)
+            throws IOException {
+        if (xAuthorizationContentSha256 == null || xAuthorizationContentSha256.length() <= 0
+                || requestBody == null) {
+            return false;
+        }
+
+        //calculate and check body hash
+        String bodyHash = this.getBase64Sha256String(requestBody); //v2 specification requires base64 encoded SHA-256
+        return bodyHash.equals(xAuthorizationContentSha256);
+    }
+
+    /**
+     * Get base64 encoded SHA-256 of an inputStream
+     * 
+     * @param inputStream
+     * @return
+     * @throws IOException
+     */
+    private String getBase64Sha256String(InputStream inputStream) throws IOException {
+        byte[] inputStreamBytes = this.convertInputStreamIntoByteArrayOutputStream(
+            inputStream).toByteArray();
+        byte[] encBody = DigestUtils.sha256(inputStreamBytes);
+        String bodyHash = Base64.encodeBase64String(encBody);
+        return bodyHash;
     }
 
     /**
@@ -250,35 +360,43 @@ public class HMACMessageCreator {
      * @return
      * @throws IOException 
      */
-    private byte[] convertInputStreamIntoBtyeArray(InputStream inputStream) throws IOException {
+    private ByteArrayOutputStream convertInputStreamIntoByteArrayOutputStream(
+            InputStream inputStream) throws IOException {
         if (inputStream == null) {
             return null;
         }
 
-        byte[] byteChunk = new byte[1000];
+        byte[] byteChunk = new byte[1024];
         int length = -1;
 
-        ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
         while ((length = inputStream.read(byteChunk)) != -1) {
-            byteOutputStream.write(byteChunk, 0, length);
+            baos.write(byteChunk, 0, length);
         }
-        byteOutputStream.flush();
-        byteOutputStream.close();
-        return byteOutputStream.toByteArray();
+        baos.flush();
+        baos.close();
+        return baos;
     }
 
     /**
-     * Method to help check if requestBody needs to be passed or can be omitted
+     * Create response signature message from HTTP response attributes
      * 
-     * @param httpVerb
-     * @param requestBodyBytes
+     * @param nonce
+     * @param xAuthorizationTimestamp
+     * @param responseContent
      * @return
      */
-    private boolean isPassingRequestBody(String httpVerb, byte[] requestBodyBytes) {
-        if (httpVerb.toUpperCase().equals("GET") || httpVerb.toUpperCase().equals("HEAD")) {
-            return false;
+    public String createSignableResponseMessage(String nonce, String xAuthorizationTimestamp,
+            String responseContent) {
+        if (responseContent == null) {
+            responseContent = "";
         }
 
-        return requestBodyBytes != null && requestBodyBytes.length > 0;
+        StringBuilder result = new StringBuilder();
+        result.append(nonce).append("\n");
+        result.append(xAuthorizationTimestamp).append("\n");
+        result.append(responseContent);
+        return result.toString();
     }
+
 }

@@ -20,7 +20,11 @@ import org.apache.http.protocol.HttpContext;
  */
 public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
 
-    private static final String VERSION = "2.0";
+    public static final String CONTEXT_HTTP_VERB = "httpVerb";
+    public static final String CONTEXT_AUTH_HEADER = "authHeader";
+    public static final String CONTEXT_X_AUTHORIZATION_TIMESTAMP = "xAuthorizationTimestamp";
+
+    public static final String VERSION = "2.0";
 
     /**
      * The Authorization provider
@@ -85,20 +89,33 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
     }
 
     @Override
-    public void process(HttpRequest request, HttpContext context) throws HttpException, IOException {
+    public void process(HttpRequest request, HttpContext context)
+            throws HttpException, IOException {
         HMACAuthorizationHeader authHeader = this.createHMACAuthorizationHeader();
-
-        HMACMessageCreator messageCreator = new HMACMessageCreator();
-        String message = messageCreator.createMessage(request, authHeader);
-        String encryptedMessage = "";
-        try {
-            encryptedMessage = this.algorithm.encryptMessage(this.secretKey, message);
-        } catch(SignatureException e) {
-            throw new IOException("Could not encrypt message", e);
+        if (authHeader == null) {
+            throw new HttpException(
+                "Error: Invalid authHeader; one or more required attributes are not set.");
         }
 
-        authHeader.setSignature(encryptedMessage);
-        request.setHeader("Authorization", authHeader.toString()); //set it with encrypted signature
+        HMACMessageCreator messageCreator = new HMACMessageCreator();
+        String signableRequestMessage = messageCreator.createSignableRequestMessage(request,
+            authHeader);
+        String signedRequestMessage = "";
+        try {
+            signedRequestMessage = this.algorithm.encryptMessage(this.secretKey,
+                signableRequestMessage);
+        } catch(SignatureException e) {
+            throw new IOException("Fail to sign request message", e);
+        }
+
+        authHeader.setSignature(signedRequestMessage);
+        request.setHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION, authHeader.toString()); //set it with encrypted signature
+
+        //set context for response interceptor
+        context.setAttribute(CONTEXT_HTTP_VERB, request.getRequestLine().getMethod().toUpperCase());
+        context.setAttribute(CONTEXT_AUTH_HEADER, authHeader);
+        context.setAttribute(CONTEXT_X_AUTHORIZATION_TIMESTAMP, request.getFirstHeader(
+            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue());
     }
 
     /**
@@ -107,8 +124,13 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
      * @return
      */
     protected HMACAuthorizationHeader createHMACAuthorizationHeader() {
-        return new HMACAuthorizationHeader(this.realm, this.accessKey,
+        HMACAuthorizationHeader result = new HMACAuthorizationHeader(this.realm, this.accessKey,
             UUID.randomUUID().toString(), VERSION, this.customHeaders, /*signature*/null);
+        if (result.isAuthorizationHeaderValid()) {
+            return result;
+        } else {
+            return null;
+        }
     }
 
 }
