@@ -92,6 +92,10 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
     public void process(HttpRequest request, HttpContext context)
             throws HttpException, IOException {
         HMACAuthorizationHeader authHeader = this.createHMACAuthorizationHeader();
+        if (authHeader == null) {
+            throw new HttpException(
+                "Error: Invalid authHeader; one or more required attributes are not set.");
+        }
 
         HMACMessageCreator messageCreator = new HMACMessageCreator();
         String signableRequestMessage = messageCreator.createSignableRequestMessage(request,
@@ -120,8 +124,13 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
      * @return
      */
     protected HMACAuthorizationHeader createHMACAuthorizationHeader() {
-        return new HMACAuthorizationHeader(this.realm, this.accessKey, UUID.randomUUID().toString(),
-            VERSION, this.customHeaders, /*signature*/null);
+        HMACAuthorizationHeader result = new HMACAuthorizationHeader(this.realm, this.accessKey,
+            UUID.randomUUID().toString(), VERSION, this.customHeaders, /*signature*/null);
+        if (result.isAuthorizationHeaderValid()) {
+            return result;
+        } else {
+            return null;
+        }
     }
 
 }

@@ -91,6 +91,11 @@ public abstract class HMACHttpServlet extends HttpServlet {
             if (authorization != null) {
                 HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
                     authorization);
+                if (authHeader == null) {
+                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                        "Error: Invalid authHeader; one or more required attributes are not set.");
+                    return;
+                }
 
                 String accessKey = authHeader.getId();
                 String signature = authHeader.getSignature();
@@ -161,6 +166,11 @@ public abstract class HMACHttpServlet extends HttpServlet {
             if (authorization != null) {
                 HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
                     authorization);
+                if (authHeader == null) {
+                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                        "Error: Authorization is invalid.");
+                    return;
+                }
 
                 String accessKey = authHeader.getId();
                 String nonce = authHeader.getNonce();

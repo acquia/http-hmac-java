@@ -61,7 +61,9 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
             Header serverAuthResponseHeader = response.getFirstHeader(
                 HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256);
             if (serverAuthResponseHeader == null) {
-                throw new HttpException("Error: Server failed to provide response validation.");
+                throw new HttpException("Error: Server failed to provide "
+                        + HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256
+                        + ", response validation header.");
             }
             String serverSignature = serverAuthResponseHeader.getValue();
 

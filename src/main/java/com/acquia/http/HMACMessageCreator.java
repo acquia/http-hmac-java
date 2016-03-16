@@ -21,6 +21,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
+import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 
 /**
@@ -71,6 +72,10 @@ public class HMACMessageCreator {
         String authorization = request.getHeader(PARAMETER_AUTHORIZATION);
         HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
             authorization);
+        if (authHeader == null) {
+            throw new IOException(
+                "Error: Invalid authHeader; one or more required attributes are not set.");
+        }
 
         Map<String, String> authorizationCustomHeaderParameterMap = this.getCustomHeaderMap(
             authHeader, request);
@@ -93,17 +98,19 @@ public class HMACMessageCreator {
      * 
      * @param authHeader
      * @param request
-     * @return
+     * @return 
+     * @throws IOException
      */
     private Map<String, String> getCustomHeaderMap(HMACAuthorizationHeader authHeader,
-            HttpServletRequest request) {
+            HttpServletRequest request) throws IOException {
         Map<String, String> theMap = new HashMap<String, String>();
         List<String> customHeaders = authHeader.getHeaders();
         if (customHeaders != null && customHeaders.size() > 0) {
             for (String headerName : customHeaders) {
                 String headerValue = request.getHeader(headerName);
                 if (headerValue == null) {
-                    continue; //FIXME: throw error? custom parameter cannot be found
+                    throw new IOException("Error: Custom header \"" + headerName
+                            + "\" cannot be found in the HTTP request.");
                 }
                 theMap.put(headerName.toLowerCase(), headerValue);
             }
@@ -117,10 +124,11 @@ public class HMACMessageCreator {
      * @param request; HTTP request
      * @param authHeader; specify authHeader
      * @return The message to be encrypted
+     * @throws HttpException
      * @throws IOException if bodyHash cannot be created
      */
     protected String createSignableRequestMessage(HttpRequest request,
-            HMACAuthorizationHeader authHeader) throws IOException {
+            HMACAuthorizationHeader authHeader) throws HttpException, IOException {
         String httpVerb = request.getRequestLine().getMethod().toUpperCase();
 
         String host = request.getFirstHeader(PARAMETER_HOST).getValue();
@@ -134,13 +142,17 @@ public class HMACMessageCreator {
                 queryParameters = "";
             }
         } catch(URISyntaxException e) {
-            throw new IOException("Invalid URI", e);
+            throw new HttpException("Error: Invalid URI.", e);
         }
 
         //if authHeader is not set, try setting it from request
         if (authHeader == null) {
             String authorization = request.getFirstHeader(PARAMETER_AUTHORIZATION).getValue();
             authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(authorization);
+            if (authHeader == null) {
+                throw new HttpException(
+                    "Error: Invalid authHeader; one or more required attributes are not set.");
+            }
         }
 
         Map<String, String> authorizationCustomHeaderParameterMap = this.getCustomHeaderMap(
@@ -196,16 +208,18 @@ public class HMACMessageCreator {
      * @param authHeader
      * @param request
      * @return
+     * @throws HttpException 
      */
     private Map<String, String> getCustomHeaderMap(HMACAuthorizationHeader authHeader,
-            HttpRequest request) {
+            HttpRequest request) throws HttpException {
         Map<String, String> theMap = new HashMap<String, String>();
         List<String> customHeaders = authHeader.getHeaders();
         if (customHeaders != null && customHeaders.size() > 0) {
             for (String headerName : customHeaders) {
                 Header customHeader = request.getFirstHeader(headerName);
                 if (customHeader == null) {
-                    continue; //FIXME: throw error? custom parameter cannot be found
+                    throw new HttpException("Error: Custom header \"" + headerName
+                            + "\" cannot be found in the HTTP request.");
                 }
                 theMap.put(headerName.toLowerCase(), customHeader.getValue());
             }
@@ -269,7 +283,8 @@ public class HMACMessageCreator {
                 result.append("\n").append(contentType.toLowerCase());
                 result.append("\n").append(xAuthorizationContentSha256);
             } else {
-                //FIXME: throw error?
+                throw new IOException(
+                    "Error: Request body does not have the same hash as X-Authorization-Content-Sha256 header.");
             }
         }
         return result.toString();
@@ -293,10 +308,9 @@ public class HMACMessageCreator {
      * @param xAuthorizationContentSha256
      * @param requestBody
      * @return
-     * @throws IOException 
      */
     private boolean isPassingRequestBody(int contentLength, String xAuthorizationContentSha256,
-            InputStream requestBody) throws IOException {
+            InputStream requestBody) {
         if (contentLength <= 0 || xAuthorizationContentSha256 == null
                 || xAuthorizationContentSha256.length() <= 0 || requestBody == null) {
             return false;

@@ -73,6 +73,11 @@ public abstract class HMACFilter implements Filter {
             if (authorization != null) {
                 HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
                     authorization);
+                if (authHeader == null) {
+                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                        "Error: Invalid authHeader; one or more required attributes are not set.");
+                    return;
+                }
 
                 String accessKey = authHeader.getId();
                 String nonce = authHeader.getNonce();

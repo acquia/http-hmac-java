@@ -68,7 +68,11 @@ public class HMACAuthorizationHeader {
             result.setSignature(signature);
         }
 
-        return result;
+        if (result.isAuthorizationHeaderValid()) {
+            return result;
+        } else {
+            return null;
+        }
     }
 
     /**
@@ -102,10 +106,6 @@ public class HMACAuthorizationHeader {
         this.version = version;
         this.headers = headers;
         this.signature = signature;
-
-        if (!this.isAuthorizationHeaderValid()) {
-            //FIXME: throw error?
-        }
     }
 
     /**
@@ -114,7 +114,7 @@ public class HMACAuthorizationHeader {
      * 
      * @return
      */
-    private boolean isAuthorizationHeaderValid() {
+    public boolean isAuthorizationHeaderValid() {
         return this.realm != null && this.realm.length() > 0 && this.id != null
                 && this.id.length() > 0 && this.nonce != null && this.nonce.length() > 0
                 && this.version != null && this.version.length() > 0;
