@@ -1,12 +1,19 @@
 package com.acquia.http;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.http.Header;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpRequestInterceptor;
@@ -97,6 +104,40 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
                 "Error: Invalid authHeader; one or more required attributes are not set.");
         }
 
+        //add X-Authorization-Timestamp if not set
+        Header xAuthorizationTimestampHeaderHeader = request.getFirstHeader(
+            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
+        if (xAuthorizationTimestampHeaderHeader == null) {
+            long unixTime = System.currentTimeMillis() / 1000L;
+            request.setHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP,
+                Long.toString(unixTime));
+        }
+
+        //check content length
+        Header contentLengthHeader = request.getFirstHeader(
+            HMACMessageCreator.PARAMETER_CONTENT_LENGTH);
+        int contentLength = 0;
+        if (contentLengthHeader != null) {
+            contentLength = Integer.parseInt(contentLengthHeader.getValue());
+        }
+        if (contentLength > 0) {
+            //add X-Authorization-Content-SHA256 if not set
+            Header xAuthorizationContentSha256Header = request.getFirstHeader(
+                HMACMessageCreator.PARAMETER_X_AUTHORIZATION_CONTENT_SHA256);
+            if (xAuthorizationContentSha256Header == null) {
+                if (request instanceof HttpEntityEnclosingRequest) {
+                    HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+                    if (entity != null) {
+                        InputStream requestBody = entity.getContent();
+                        String bodyHash = this.getBase64Sha256String(requestBody);
+                        request.setHeader(
+                            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_CONTENT_SHA256, bodyHash);
+                    }
+                }
+            }
+        }
+
+        //create signature
         HMACMessageCreator messageCreator = new HMACMessageCreator();
         String signableRequestMessage = messageCreator.createSignableRequestMessage(request,
             authHeader);
@@ -109,13 +150,14 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         }
 
         authHeader.setSignature(signedRequestMessage);
-        request.setHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION, authHeader.toString()); //set it with encrypted signature
+        //add Authorization with encrypted signature
+        request.setHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION, authHeader.toString());
 
         //set context for response interceptor
         context.setAttribute(CONTEXT_HTTP_VERB, request.getRequestLine().getMethod().toUpperCase());
         context.setAttribute(CONTEXT_AUTH_HEADER, authHeader);
         context.setAttribute(CONTEXT_X_AUTHORIZATION_TIMESTAMP, request.getFirstHeader(
-            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue());
+            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue()); //this header is guaranteed to exist
     }
 
     /**
@@ -131,6 +173,46 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         } else {
             return null;
         }
+    }
+
+    /**
+     * Get base64 encoded SHA-256 of an inputStream
+     * 
+     * @param inputStream
+     * @return
+     * @throws IOException
+     */
+    private String getBase64Sha256String(InputStream inputStream) throws IOException {
+        byte[] inputStreamBytes = this.convertInputStreamIntoByteArrayOutputStream(
+            inputStream).toByteArray();
+        byte[] encBody = DigestUtils.sha256(inputStreamBytes);
+        String bodyHash = Base64.encodeBase64String(encBody);
+        return bodyHash;
+    }
+
+    /**
+     * Convert InputStream into byte[]
+     * 
+     * @param inputStream
+     * @return
+     * @throws IOException 
+     */
+    private ByteArrayOutputStream convertInputStreamIntoByteArrayOutputStream(
+            InputStream inputStream) throws IOException {
+        if (inputStream == null) {
+            return null;
+        }
+
+        byte[] byteChunk = new byte[1024];
+        int length = -1;
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        while ((length = inputStream.read(byteChunk)) != -1) {
+            baos.write(byteChunk, 0, length);
+        }
+        baos.flush();
+        baos.close();
+        return baos;
     }
 
 }
