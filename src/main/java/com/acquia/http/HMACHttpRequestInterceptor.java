@@ -1,8 +1,10 @@
 package com.acquia.http;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -126,12 +128,65 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
                 HMACMessageCreator.PARAMETER_X_AUTHORIZATION_CONTENT_SHA256);
             if (xAuthorizationContentSha256Header == null) {
                 if (request instanceof HttpEntityEnclosingRequest) {
-                    HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+                    final HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
                     if (entity != null) {
-                        InputStream requestBody = entity.getContent();
-                        String bodyHash = this.getBase64Sha256String(requestBody);
+                        //request body can only be consumed once - so copy this somewhere
+                        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        entity.writeTo(baos);
+                        baos.flush();
+                        baos.close();
+                        String bodyHash = this.getBase64Sha256String(baos.toByteArray());
                         request.setHeader(
                             HMACMessageCreator.PARAMETER_X_AUTHORIZATION_CONTENT_SHA256, bodyHash);
+
+                        //set the entity again so it is ready for further consumption
+                        ((HttpEntityEnclosingRequest) request).setEntity(new HttpEntity() {
+                            @Override
+                            public boolean isRepeatable() {
+                                return entity.isRepeatable();
+                            }
+
+                            @Override
+                            public boolean isChunked() {
+                                return entity.isChunked();
+                            }
+
+                            @Override
+                            public long getContentLength() {
+                                return entity.getContentLength();
+                            }
+
+                            @Override
+                            public Header getContentType() {
+                                return entity.getContentType();
+                            }
+
+                            @Override
+                            public Header getContentEncoding() {
+                                return entity.getContentEncoding();
+                            }
+
+                            @Override
+                            public InputStream getContent()
+                                    throws IOException, IllegalStateException {
+                                return new ByteArrayInputStream(baos.toByteArray());
+                            }
+
+                            @Override
+                            public void writeTo(OutputStream outstream) throws IOException {
+                                entity.writeTo(outstream);
+                            }
+
+                            @Override
+                            public boolean isStreaming() {
+                                return entity.isStreaming();
+                            }
+
+                            @Override
+                            public void consumeContent() throws IOException {
+                                entity.consumeContent();
+                            }
+                        });
                     }
                 }
             }
@@ -176,43 +231,16 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
     }
 
     /**
-     * Get base64 encoded SHA-256 of an inputStream
+     * Get base64 encoded SHA-256 of an inputStreamBytes
      * 
-     * @param inputStream
+     * @param inputStreamBytes
      * @return
      * @throws IOException
      */
-    private String getBase64Sha256String(InputStream inputStream) throws IOException {
-        byte[] inputStreamBytes = this.convertInputStreamIntoByteArrayOutputStream(
-            inputStream).toByteArray();
+    private String getBase64Sha256String(byte[] inputStreamBytes) throws IOException {
         byte[] encBody = DigestUtils.sha256(inputStreamBytes);
         String bodyHash = Base64.encodeBase64String(encBody);
         return bodyHash;
-    }
-
-    /**
-     * Convert InputStream into byte[]
-     * 
-     * @param inputStream
-     * @return
-     * @throws IOException 
-     */
-    private ByteArrayOutputStream convertInputStreamIntoByteArrayOutputStream(
-            InputStream inputStream) throws IOException {
-        if (inputStream == null) {
-            return null;
-        }
-
-        byte[] byteChunk = new byte[1024];
-        int length = -1;
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        while ((length = inputStream.read(byteChunk)) != -1) {
-            baos.write(byteChunk, 0, length);
-        }
-        baos.flush();
-        baos.close();
-        return baos;
     }
 
 }
