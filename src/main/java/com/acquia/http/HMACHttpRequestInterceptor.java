@@ -1,12 +1,21 @@
 package com.acquia.http;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.http.Header;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpRequestInterceptor;
@@ -97,6 +106,93 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
                 "Error: Invalid authHeader; one or more required attributes are not set.");
         }
 
+        //add X-Authorization-Timestamp if not set
+        Header xAuthorizationTimestampHeaderHeader = request.getFirstHeader(
+            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
+        if (xAuthorizationTimestampHeaderHeader == null) {
+            long unixTime = this.getCurrentUnixTime();
+            request.setHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP,
+                Long.toString(unixTime));
+        }
+
+        //check content length
+        Header contentLengthHeader = request.getFirstHeader(
+            HMACMessageCreator.PARAMETER_CONTENT_LENGTH);
+        int contentLength = 0;
+        if (contentLengthHeader != null) {
+            contentLength = Integer.parseInt(contentLengthHeader.getValue());
+        }
+        if (contentLength > 0) {
+            //add X-Authorization-Content-SHA256 if not set
+            Header xAuthorizationContentSha256Header = request.getFirstHeader(
+                HMACMessageCreator.PARAMETER_X_AUTHORIZATION_CONTENT_SHA256);
+            if (xAuthorizationContentSha256Header == null) {
+                if (request instanceof HttpEntityEnclosingRequest) {
+                    final HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+                    if (entity != null) {
+                        //request body can only be consumed once - so copy this somewhere
+                        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        entity.writeTo(baos);
+                        baos.flush();
+                        baos.close();
+                        String bodyHash = this.getBase64Sha256String(baos.toByteArray());
+                        request.setHeader(
+                            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_CONTENT_SHA256, bodyHash);
+
+                        //set the entity again so it is ready for further consumption
+                        ((HttpEntityEnclosingRequest) request).setEntity(new HttpEntity() {
+                            @Override
+                            public boolean isRepeatable() {
+                                return entity.isRepeatable();
+                            }
+
+                            @Override
+                            public boolean isChunked() {
+                                return entity.isChunked();
+                            }
+
+                            @Override
+                            public long getContentLength() {
+                                return entity.getContentLength();
+                            }
+
+                            @Override
+                            public Header getContentType() {
+                                return entity.getContentType();
+                            }
+
+                            @Override
+                            public Header getContentEncoding() {
+                                return entity.getContentEncoding();
+                            }
+
+                            @Override
+                            public InputStream getContent()
+                                    throws IOException, IllegalStateException {
+                                return new ByteArrayInputStream(baos.toByteArray());
+                            }
+
+                            @Override
+                            public void writeTo(OutputStream outstream) throws IOException {
+                                entity.writeTo(outstream);
+                            }
+
+                            @Override
+                            public boolean isStreaming() {
+                                return entity.isStreaming();
+                            }
+
+                            @Override
+                            public void consumeContent() throws IOException {
+                                entity.consumeContent();
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
+        //create signature
         HMACMessageCreator messageCreator = new HMACMessageCreator();
         String signableRequestMessage = messageCreator.createSignableRequestMessage(request,
             authHeader);
@@ -109,13 +205,14 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         }
 
         authHeader.setSignature(signedRequestMessage);
-        request.setHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION, authHeader.toString()); //set it with encrypted signature
+        //add Authorization with encrypted signature
+        request.setHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION, authHeader.toString());
 
         //set context for response interceptor
         context.setAttribute(CONTEXT_HTTP_VERB, request.getRequestLine().getMethod().toUpperCase());
         context.setAttribute(CONTEXT_AUTH_HEADER, authHeader);
         context.setAttribute(CONTEXT_X_AUTHORIZATION_TIMESTAMP, request.getFirstHeader(
-            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue());
+            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue()); //this header is guaranteed to exist
     }
 
     /**
@@ -131,6 +228,28 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         } else {
             return null;
         }
+    }
+
+    /**
+     * get current unix timestamp in seconds
+     * @return
+     */
+    protected long getCurrentUnixTime() {
+        long unixTime = System.currentTimeMillis() / 1000L;
+        return unixTime;
+    }
+
+    /**
+     * Get base64 encoded SHA-256 of an inputStreamBytes
+     * 
+     * @param inputStreamBytes
+     * @return
+     * @throws IOException
+     */
+    protected String getBase64Sha256String(byte[] inputStreamBytes) throws IOException {
+        byte[] encBody = DigestUtils.sha256(inputStreamBytes);
+        String bodyHash = Base64.encodeBase64String(encBody);
+        return bodyHash;
     }
 
 }
