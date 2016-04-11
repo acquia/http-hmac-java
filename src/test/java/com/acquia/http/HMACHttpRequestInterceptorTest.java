@@ -2,10 +2,10 @@ package com.acquia.http;
 
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,8 +45,8 @@ public class HMACHttpRequestInterceptorTest {
         final HMACAuthorizationHeader authHeader = new HMACAuthorizationHeader(realm, id, nonce,
             version);
 
-        HMACHttpRequestInterceptor requestInterceptor = new HMACHttpRequestInterceptor(realm,
-            id, secretKey, "SHA256") {
+        HMACHttpRequestInterceptor requestInterceptor = new HMACHttpRequestInterceptor(realm, id,
+            secretKey, "SHA256") {
 
             @Override
             protected HMACAuthorizationHeader createHMACAuthorizationHeader() {
@@ -96,7 +96,7 @@ public class HMACHttpRequestInterceptorTest {
         requestInterceptor.process(request, context);
 
         //verify that X-Authorization-Timestamp is set once, since we had deliberately not set this header before
-        verify(request, atLeast(1)).setHeader(
+        verify(request, times(1)).setHeader(
             eq(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP),
             eq(xAuthorizationTimestamp));
 
@@ -129,8 +129,8 @@ public class HMACHttpRequestInterceptorTest {
         final HMACAuthorizationHeader authHeader = new HMACAuthorizationHeader(realm, id, nonce,
             version);
 
-        HMACHttpRequestInterceptor requestInterceptor = new HMACHttpRequestInterceptor(realm,
-            id, secretKey, "SHA256") {
+        HMACHttpRequestInterceptor requestInterceptor = new HMACHttpRequestInterceptor(realm, id,
+            secretKey, "SHA256") {
 
             @Override
             protected HMACAuthorizationHeader createHMACAuthorizationHeader() {
@@ -203,7 +203,7 @@ public class HMACHttpRequestInterceptorTest {
             eq(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP), (String) anyObject());
 
         //verify that X-Authorization-Content-SHA256 is set once, since we had deliberately not set this header before
-        verify(request, atLeast(1)).setHeader(
+        verify(request, times(1)).setHeader(
             eq(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_CONTENT_SHA256),
             eq(xAuthorizationContentSha256));
 
