@@ -100,6 +100,10 @@ public class HMACHttpRequestInterceptorTest {
             eq(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP),
             eq(xAuthorizationTimestamp));
 
+        //verify that X-Authorization-Content-SHA256 is never set, since this is a GET request, contentLength == 0
+        verify(request, never()).setHeader(
+            eq(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_CONTENT_SHA256), (String) anyObject());
+
         //check the calculated signature
         HMACAuthorizationHeader calculatedAuthHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
             calcAuthorizationHeader.toString());
@@ -107,13 +111,114 @@ public class HMACHttpRequestInterceptorTest {
     }
 
     @Test
-    public void testPostAuthorizationHeader() throws IOException, HttpException {
+    public void testPostAuthorizationHeader_setHeaders() throws IOException, HttpException {
         //base Authorization parameter
         String realm = "Plexus";
         String id = "f0d16792-cdc9-4585-a5fd-bae3d898d8c5";
         String nonce = "64d02132-40bf-4fce-85bf-3f1bb1bfe7dd";
         String version = "2.0";
         String xAuthorizationTimestamp = "1449578521";
+
+        String httpMethod = "POST";
+        String hostPort = "54.154.147.142:3000";
+        String uri = "/register";
+        String secretKey = "eox4TsBBPhpi737yMxpdBbr3sgg/DEC4m47VXO0B8qJLsbdMsmN47j/ZF/EFpyUKtAhm0OWXMGaAjRaho7/93Q==";
+
+        String contentType = "application/json";
+        String xAuthorizationContentSha256 = "6paRNxUA7WawFxJpRp4cEixDjHq3jfIKX072k9slalo=";
+        String reqBody = "{\"method\":\"hi.bob\",\"params\":[\"5\",\"4\",\"8\"]}";
+
+        String expectedSignature = "4VtBHjqrdDeYrJySoJVDUHpN9u3vyTsyOLz4chezi98=";
+
+        final HMACAuthorizationHeader authHeader = new HMACAuthorizationHeader(realm, id, nonce,
+            version);
+
+        HMACHttpRequestInterceptor requestInterceptor = new HMACHttpRequestInterceptor(realm, id,
+            secretKey, "SHA256") {
+
+            @Override
+            protected HMACAuthorizationHeader createHMACAuthorizationHeader() {
+                return authHeader;
+            }
+
+        };
+        requestInterceptor.setCustomHeaders(new String[] {});
+
+        HttpEntityEnclosingRequest request = mock(HttpEntityEnclosingRequest.class);
+
+        RequestLine requestLine = mock(RequestLine.class);
+        when(requestLine.getMethod()).thenReturn(httpMethod);
+        when(requestLine.getUri()).thenReturn(uri);
+        when(request.getRequestLine()).thenReturn(requestLine);
+
+        final ByteArrayInputStream realInputStream = new ByteArrayInputStream(reqBody.getBytes());
+        InputStream requestInputStream = new InputStream() {
+            @Override
+            public int read() {
+                return realInputStream.read();
+            }
+        };
+        HttpEntity requestEntity = mock(HttpEntity.class);
+        when(requestEntity.getContent()).thenReturn(requestInputStream);
+        when(request.getEntity()).thenReturn(requestEntity);
+
+        Header hostPortHeader = mockHeader(hostPort);
+        when(request.getFirstHeader(HMACMessageCreator.PARAMETER_HOST)).thenReturn(hostPortHeader);
+        Header contentLengthHeader = mockHeader(
+            Integer.toString(reqBody.getBytes(HMACMessageCreator.ENCODING_UTF_8).length));
+        when(request.getFirstHeader(HMACMessageCreator.PARAMETER_CONTENT_LENGTH)).thenReturn(
+            contentLengthHeader);
+        Header contentTypeHeader = mockHeader(contentType);
+        when(request.getFirstHeader(HMACMessageCreator.PARAMETER_CONTENT_TYPE)).thenReturn(
+            contentTypeHeader);
+        Header xAuthorizationContentSha256Header = mockHeader(xAuthorizationContentSha256);
+        when(request.getFirstHeader(
+            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_CONTENT_SHA256)).thenReturn(
+                xAuthorizationContentSha256Header); //return real value right away - denoting that header had previously been set
+        Header xAuthorizationTimestampHeader = mockHeader(xAuthorizationTimestamp);
+        when(request.getFirstHeader(
+            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP)).thenReturn(
+                xAuthorizationTimestampHeader); //return real value right away - denoting that header had previously been set
+
+        final StringBuilder calcAuthorizationHeader = new StringBuilder();
+        doAnswer(new Answer<Void>() {
+            public Void answer(InvocationOnMock invocation) {
+                Object[] args = invocation.getArguments();
+                String headerKey = (String) args[0];
+                String valueKey = (String) args[1];
+                if (HMACMessageCreator.PARAMETER_AUTHORIZATION.equals(headerKey)) {
+                    calcAuthorizationHeader.append(valueKey);
+                }
+                return null;
+            }
+        }).when(request).setHeader((String) anyObject(), (String) anyObject());
+
+        HttpContext context = mock(HttpContext.class);
+
+        requestInterceptor.process(request, context);
+
+        //verify that X-Authorization-Timestamp is never set, since we had set this header before
+        verify(request, never()).setHeader(
+            eq(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP), (String) anyObject());
+
+        //verify that X-Authorization-Content-SHA256 is never set, since we had set this header before
+        verify(request, never()).setHeader(
+            eq(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_CONTENT_SHA256), (String) anyObject());
+
+        //check the calculated signature
+        HMACAuthorizationHeader calculatedAuthHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
+            calcAuthorizationHeader.toString());
+        Assert.assertEquals(expectedSignature, calculatedAuthHeader.getSignature());
+    }
+
+    @Test
+    public void testPostAuthorizationHeader_doesNotSetHeaders() throws IOException, HttpException {
+        //base Authorization parameter
+        String realm = "Plexus";
+        String id = "f0d16792-cdc9-4585-a5fd-bae3d898d8c5";
+        String nonce = "64d02132-40bf-4fce-85bf-3f1bb1bfe7dd";
+        String version = "2.0";
+        final String xAuthorizationTimestamp = "1449578521";
 
         String httpMethod = "POST";
         String hostPort = "54.154.147.142:3000";
@@ -135,6 +240,11 @@ public class HMACHttpRequestInterceptorTest {
             @Override
             protected HMACAuthorizationHeader createHMACAuthorizationHeader() {
                 return authHeader;
+            }
+
+            @Override
+            protected long getCurrentUnixTime() {
+                return Long.parseLong(xAuthorizationTimestamp);
             }
 
             @Override
@@ -178,8 +288,8 @@ public class HMACHttpRequestInterceptorTest {
                 .thenReturn(xAuthorizationContentSha256Header); //return real value - this is the value we will use to create signable message
         Header xAuthorizationTimestampHeader = mockHeader(xAuthorizationTimestamp);
         when(request.getFirstHeader(
-            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP)).thenReturn( //return real value right away - denoting that header had previously been set
-                xAuthorizationTimestampHeader);
+            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP)).thenReturn(null) //first return null - denoting that header had not been set
+                .thenReturn(xAuthorizationTimestampHeader); //return real value - this is the value we will use to create signable message
 
         final StringBuilder calcAuthorizationHeader = new StringBuilder();
         doAnswer(new Answer<Void>() {
@@ -198,9 +308,10 @@ public class HMACHttpRequestInterceptorTest {
 
         requestInterceptor.process(request, context);
 
-        //verify that X-Authorization-Timestamp is never set, since we had set this header before
-        verify(request, never()).setHeader(
-            eq(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP), (String) anyObject());
+        //verify that X-Authorization-Timestamp is set once, since we had deliberately not set this header before
+        verify(request, times(1)).setHeader(
+            eq(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP),
+            eq(xAuthorizationTimestamp));
 
         //verify that X-Authorization-Content-SHA256 is set once, since we had deliberately not set this header before
         verify(request, times(1)).setHeader(
