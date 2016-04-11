@@ -110,7 +110,7 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         Header xAuthorizationTimestampHeaderHeader = request.getFirstHeader(
             HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
         if (xAuthorizationTimestampHeaderHeader == null) {
-            long unixTime = System.currentTimeMillis() / 1000L;
+            long unixTime = this.getCurrentUnixTime();
             request.setHeader(HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP,
                 Long.toString(unixTime));
         }
@@ -231,13 +231,22 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
     }
 
     /**
+     * get current unix timestamp in seconds
+     * @return
+     */
+    protected long getCurrentUnixTime() {
+        long unixTime = System.currentTimeMillis() / 1000L;
+        return unixTime;
+    }
+
+    /**
      * Get base64 encoded SHA-256 of an inputStreamBytes
      * 
      * @param inputStreamBytes
      * @return
      * @throws IOException
      */
-    private String getBase64Sha256String(byte[] inputStreamBytes) throws IOException {
+    protected String getBase64Sha256String(byte[] inputStreamBytes) throws IOException {
         byte[] encBody = DigestUtils.sha256(inputStreamBytes);
         String bodyHash = Base64.encodeBase64String(encBody);
         return bodyHash;
