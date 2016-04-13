@@ -86,7 +86,8 @@ public class HMACFilterTest {
                 xAuthorizationContentSha256);
 
         when(this.request.getMethod()).thenReturn(httpMethod);
-        when(this.request.getServerName()).thenReturn("54.154.147.142:3000");
+        when(this.request.getHeader(HMACMessageCreator.PARAMETER_HOST)).thenReturn(
+            "54.154.147.142:3000");
         when(this.request.getRequestURI()).thenReturn("/register");
         when(this.request.getQueryString()).thenReturn("");
 

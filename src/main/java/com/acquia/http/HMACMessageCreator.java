@@ -61,8 +61,7 @@ public class HMACMessageCreator {
     public String createSignableRequestMessage(HttpServletRequest request) throws IOException {
         String httpVerb = request.getMethod().toUpperCase();
 
-        int port = request.getServerPort();
-        String host = request.getServerName() + (port > 0 ? ":" + port : "");
+        String host = request.getHeader(PARAMETER_HOST);
         String path = request.getRequestURI();
         String queryParameters = request.getQueryString();
         if (queryParameters == null) {
