@@ -12,6 +12,8 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.log4j.Logger;
+
 /**
  * Abstract Filter that can validate HTTP requests by the HMAC Authorization header.
  * This will also append server validation response header.
@@ -20,6 +22,8 @@ import javax.servlet.http.HttpServletResponse;
  *
  */
 public abstract class HMACFilter implements Filter {
+
+    private static Logger logger = Logger.getLogger(HMACFilter.class);
 
     /**
      * The config parameter that defines the name of the algorithm used to create the HMAC.
@@ -53,17 +57,20 @@ public abstract class HMACFilter implements Filter {
                 int timestampStatus = this.compareTimestampWithinTolerance(
                     Long.parseLong(xAuthorizationTimestamp));
                 if (timestampStatus > 0) {
-                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                        "Error: X-Authorization-Timestamp is too far in the future.");
+                    String message = "Error: X-Authorization-Timestamp is too far in the future.";
+                    logger.error(message);
+                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                     return;
                 } else if (timestampStatus < 0) {
-                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                        "Error: X-Authorization-Timestamp is too far in the past.");
+                    String message = "Error: X-Authorization-Timestamp is too far in the past.";
+                    logger.error(message);
+                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                     return;
                 }
             } else {
-                httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                    "Error: X-Authorization-Timestamp is required.");
+                String message = "Error: X-Authorization-Timestamp is required.";
+                logger.error(message);
+                httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                 return;
             }
 
@@ -74,8 +81,9 @@ public abstract class HMACFilter implements Filter {
                 HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
                     authorization);
                 if (authHeader == null) {
-                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                        "Error: Invalid authHeader; one or more required attributes are not set.");
+                    String message = "Error: Invalid authHeader; one or more required attributes are not set.";
+                    logger.error(message);
+                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                     return;
                 }
 
@@ -89,17 +97,22 @@ public abstract class HMACFilter implements Filter {
                 HMACMessageCreator messageCreator = new HMACMessageCreator();
                 String signableRequestMessage = messageCreator.createSignableRequestMessage(
                     httpRequest);
+                logger.trace("signableRequestMessage:\n" + signableRequestMessage);
                 String signedRequestMessage = "";
                 try {
                     signedRequestMessage = this.algorithm.encryptMessage(secretKey,
                         signableRequestMessage);
+                    logger.trace("signedRequestMessage:\n" + signedRequestMessage);
                 } catch(SignatureException e) {
-                    throw new IOException("Fail to sign request message", e);
+                    String message = "Fail to sign request message";
+                    logger.error(message);
+                    throw new IOException(message, e);
                 }
 
                 if (signature.compareTo(signedRequestMessage) != 0) {
-                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                        "Error: Invalid authentication token.");
+                    String message = "Error: Invalid authentication token.";
+                    logger.error(message);
+                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                     return;
                 }
 
@@ -110,20 +123,25 @@ public abstract class HMACFilter implements Filter {
                 String responseContent = wrappedResponse.toString();
                 String signableResponseMessage = messageCreator.createSignableResponseMessage(nonce,
                     xAuthorizationTimestamp, responseContent);
+                logger.trace("signableResponseMessage:\n" + signableResponseMessage);
                 String signedResponseMessage = "";
                 try {
                     signedResponseMessage = this.algorithm.encryptMessage(secretKey,
                         signableResponseMessage);
+                    logger.trace("signedResponseMessage:\n" + signedResponseMessage);
                 } catch(SignatureException e) {
-                    throw new IOException("Fail to sign response message", e);
+                    String message = "Fail to sign response message";
+                    logger.error(message);
+                    throw new IOException(message, e);
                 }
                 httpResponse.setHeader(
                     HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256,
                     signedResponseMessage);
                 httpResponse.getOutputStream().write(wrappedResponse.getByteArray()); //write back the response
             } else {
-                httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                    "Error: Authorization is required.");
+                String message = "Error: Authorization is required.";
+                logger.error(message);
+                httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                 return;
             }
         }

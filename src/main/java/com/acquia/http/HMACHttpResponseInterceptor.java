@@ -13,6 +13,7 @@ import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpResponseInterceptor;
 import org.apache.http.protocol.HttpContext;
+import org.apache.log4j.Logger;
 
 /**
  * An HttpResponseInterceptor that adds X-Server-Authorization-HMAC-SHA256 response header that contains the encrypted response
@@ -21,6 +22,8 @@ import org.apache.http.protocol.HttpContext;
  *
  */
 public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
+
+    private static Logger logger = Logger.getLogger(HttpResponseInterceptor.class);
 
     /**
      * The secret key
@@ -52,7 +55,9 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
         String httpVerb = (String) context.getAttribute(
             HMACHttpRequestInterceptor.CONTEXT_HTTP_VERB);
         if (httpVerb == null) {
-            throw new HttpException("Error: No httpVerb in the HTTP context.");
+            String message = "Error: No httpVerb in the HTTP context.";
+            logger.error(message);
+            throw new HttpException(message);
         }
 
         //upon HEAD method, server will not append server validation header
@@ -61,9 +66,14 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
             Header serverAuthResponseHeader = response.getFirstHeader(
                 HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256);
             if (serverAuthResponseHeader == null) {
-                throw new HttpException("Error: Server failed to provide "
+                StringBuffer statusBuffer = new StringBuffer("Error: Server failed to provide "
                         + HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256
                         + ", response validation header.");
+                statusBuffer.append("\nStatus Line: " + response.getStatusLine().toString());
+
+                String message = statusBuffer.toString();
+                logger.error(message);
+                throw new HttpException(message);
             }
             String serverSignature = serverAuthResponseHeader.getValue();
 
@@ -71,7 +81,9 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
             HMACAuthorizationHeader authHeader = (HMACAuthorizationHeader) context.getAttribute(
                 HMACHttpRequestInterceptor.CONTEXT_AUTH_HEADER);
             if (authHeader == null) {
-                throw new HttpException("Error: No authHeader in the HTTP context.");
+                String message = "Error: No authHeader in the HTTP context.";
+                logger.error(message);
+                throw new HttpException(message);
             }
             String nonce = authHeader.getNonce();
 
@@ -79,7 +91,9 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
             String xAuthorizationTimestamp = (String) context.getAttribute(
                 HMACHttpRequestInterceptor.CONTEXT_X_AUTHORIZATION_TIMESTAMP);
             if (xAuthorizationTimestamp == null) {
-                throw new HttpException("Error: No xAuthorizationTimestamp in the HTTP context.");
+                String message = "Error: No xAuthorizationTimestamp in the HTTP context.";
+                logger.error(message);
+                throw new HttpException(message);
             }
 
             //get server response body
@@ -135,6 +149,7 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
                         return entity.isStreaming();
                     }
 
+                    @SuppressWarnings("deprecation")
                     @Override
                     public void consumeContent() throws IOException {
                         entity.consumeContent();
@@ -146,16 +161,22 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
             HMACMessageCreator messageCreator = new HMACMessageCreator();
             String signableResponseMessage = messageCreator.createSignableResponseMessage(nonce,
                 xAuthorizationTimestamp, responseContent);
+            logger.trace("signableResponseMessage:\n" + signableResponseMessage);
             String signedResponseMessage = "";
             try {
                 signedResponseMessage = this.algorithm.encryptMessage(this.secretKey,
                     signableResponseMessage);
+                logger.trace("signedResponseMessage:\n" + signedResponseMessage);
             } catch(SignatureException e) {
-                throw new IOException("Fail to sign response message", e);
+                String message = "Fail to sign response message";
+                logger.error(message);
+                throw new IOException(message, e);
             }
 
             if (serverSignature.compareTo(signedResponseMessage) != 0) {
-                throw new HttpException("Error: Invalid server response validation.");
+                String message = "Error: Invalid server response validation.";
+                logger.error(message);
+                throw new HttpException(message);
             }
         }
     }
