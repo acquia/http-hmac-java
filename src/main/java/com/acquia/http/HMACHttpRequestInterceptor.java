@@ -20,6 +20,7 @@ import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.protocol.HttpContext;
+import org.apache.log4j.Logger;
 
 /**
  * An HttpRequestInterceptor that adds the Authorization header that contains the HMAC.
@@ -28,6 +29,8 @@ import org.apache.http.protocol.HttpContext;
  *
  */
 public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
+
+    private static Logger logger = Logger.getLogger(HMACHttpRequestInterceptor.class);
 
     public static final String CONTEXT_HTTP_VERB = "httpVerb";
     public static final String CONTEXT_AUTH_HEADER = "authHeader";
@@ -102,8 +105,9 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
             throws HttpException, IOException {
         HMACAuthorizationHeader authHeader = this.createHMACAuthorizationHeader();
         if (authHeader == null) {
-            throw new HttpException(
-                "Error: Invalid authHeader; one or more required attributes are not set.");
+            String message = "Error: Invalid authHeader; one or more required attributes are not set.";
+            logger.error(message);
+            throw new HttpException(message);
         }
 
         //add X-Authorization-Timestamp if not set
@@ -182,6 +186,7 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
                                 return entity.isStreaming();
                             }
 
+                            @SuppressWarnings("deprecation")
                             @Override
                             public void consumeContent() throws IOException {
                                 entity.consumeContent();
@@ -196,12 +201,16 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         HMACMessageCreator messageCreator = new HMACMessageCreator();
         String signableRequestMessage = messageCreator.createSignableRequestMessage(request,
             authHeader);
+        logger.trace("signableRequestMessage:\n" + signableRequestMessage);
         String signedRequestMessage = "";
         try {
             signedRequestMessage = this.algorithm.encryptMessage(this.secretKey,
                 signableRequestMessage);
+            logger.trace("signedRequestMessage:\n" + signedRequestMessage);
         } catch(SignatureException e) {
-            throw new IOException("Fail to sign request message", e);
+            String message = "Fail to sign request message";
+            logger.error(message);
+            throw new IOException(message, e);
         }
 
         authHeader.setSignature(signedRequestMessage);
