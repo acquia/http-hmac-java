@@ -45,99 +45,105 @@ public abstract class HMACHttpServlet extends HttpServlet {
     @Override
     public void service(ServletRequest request, ServletResponse response)
             throws ServletException, IOException {
-        //upon entry
-        this.validateRequestAuthorization(request, response);
+        if (request instanceof HttpServletRequest && response instanceof HttpServletResponse) {
+            HttpServletRequest httpRequest = (HttpServletRequest) request;
+            HttpServletResponse httpResponse = (HttpServletResponse) response;
+            CharRequestWrapper wrappedRequest = new CharRequestWrapper(httpRequest);
+            CharResponseWrapper wrappedResponse = new CharResponseWrapper(httpResponse);
 
-        //do service
-        super.service(request, response);
+            //upon entry
+            this.validateRequestAuthorization(wrappedRequest, wrappedResponse);
 
-        //upon exit
-        this.appendServerResponseValidation(request, response);
+            //reset input stream so it is ready to be consumed again
+            wrappedRequest.resetInputStream();
+
+            //do service
+            super.service(wrappedRequest, wrappedResponse);
+
+            //upon exit
+            this.appendServerResponseValidation(wrappedRequest, wrappedResponse);
+        } else {
+            super.service(request, response);
+        }
     }
 
     /**
      * Helper method to validate request authorization
      * 
-     * @param request
-     * @param response
+     * @param wrappedRequest
+     * @param wrappedResponse
      * @throws IOException
      */
-    private void validateRequestAuthorization(ServletRequest request, ServletResponse response)
-            throws IOException {
-        if (request instanceof HttpServletRequest && response instanceof HttpServletResponse) {
-            HttpServletRequest httpRequest = (HttpServletRequest) request;
-            HttpServletResponse httpResponse = (HttpServletResponse) response;
-
-            //check timestamp
-            String xAuthorizationTimestamp = httpRequest.getHeader(
-                HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
-            if (xAuthorizationTimestamp != null) {
-                int timestampStatus = this.compareTimestampWithinTolerance(
-                    Long.parseLong(xAuthorizationTimestamp));
-                if (timestampStatus > 0) {
-                    String message = "Error: X-Authorization-Timestamp is too far in the future.";
-                    logger.error(message);
-                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
-                    return;
-                } else if (timestampStatus < 0) {
-                    String message = "Error: X-Authorization-Timestamp is too far in the past.";
-                    logger.error(message);
-                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
-                    return;
-                }
-            } else {
-                String message = "Error: X-Authorization-Timestamp is required.";
+    private void validateRequestAuthorization(CharRequestWrapper wrappedRequest,
+            CharResponseWrapper wrappedResponse) throws IOException {
+        //check timestamp
+        String xAuthorizationTimestamp = wrappedRequest.getHeader(
+            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
+        if (xAuthorizationTimestamp != null) {
+            int timestampStatus = this.compareTimestampWithinTolerance(
+                Long.parseLong(xAuthorizationTimestamp));
+            if (timestampStatus > 0) {
+                String message = "Error: X-Authorization-Timestamp is too far in the future.";
                 logger.error(message);
-                httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                return;
+            } else if (timestampStatus < 0) {
+                String message = "Error: X-Authorization-Timestamp is too far in the past.";
+                logger.error(message);
+                wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                return;
+            }
+        } else {
+            String message = "Error: X-Authorization-Timestamp is required.";
+            logger.error(message);
+            wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+            return;
+        }
+
+        //check authorization
+        String authorization = wrappedRequest.getHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION);
+        if (authorization != null) {
+            HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
+                authorization);
+            if (authHeader == null) {
+                String message = "Error: Invalid authHeader; one or more required attributes are not set.";
+                logger.error(message);
+                wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                 return;
             }
 
-            //check authorization
-            String authorization = httpRequest.getHeader(
-                HMACMessageCreator.PARAMETER_AUTHORIZATION);
-            if (authorization != null) {
-                HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
-                    authorization);
-                if (authHeader == null) {
-                    String message = "Error: Invalid authHeader; one or more required attributes are not set.";
-                    logger.error(message);
-                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
-                    return;
-                }
+            String accessKey = authHeader.getId();
+            String signature = authHeader.getSignature();
 
-                String accessKey = authHeader.getId();
-                String signature = authHeader.getSignature();
+            String secretKey = getSecretKey(accessKey);
 
-                String secretKey = getSecretKey(accessKey);
-
-                //check request validity
-                HMACMessageCreator messageCreator = new HMACMessageCreator();
-                String signableRequestMessage = messageCreator.createSignableRequestMessage(
-                    httpRequest);
-                logger.trace("signableRequestMessage:\n" + signableRequestMessage);
-                String signedRequestMessage = "";
-                try {
-                    signedRequestMessage = this.algorithm.encryptMessage(secretKey,
-                        signableRequestMessage);
-                    logger.trace("signedRequestMessage:\n" + signedRequestMessage);
-                } catch(SignatureException e) {
-                    String message = "Fail to sign request message";
-                    logger.error(message);
-                    throw new IOException(message, e);
-                }
-
-                if (signature.compareTo(signedRequestMessage) != 0) {
-                    String message = "Error: Invalid authentication token.";
-                    logger.error(message);
-                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
-                    return;
-                }
-            } else {
-                String message = "Error: Authorization is required.";
+            //check request validity
+            HMACMessageCreator messageCreator = new HMACMessageCreator();
+            String signableRequestMessage = messageCreator.createSignableRequestMessage(
+                wrappedRequest);
+            logger.trace("signableRequestMessage:\n" + signableRequestMessage);
+            String signedRequestMessage = "";
+            try {
+                signedRequestMessage = this.algorithm.encryptMessage(secretKey,
+                    signableRequestMessage);
+                logger.trace("signedRequestMessage:\n" + signedRequestMessage);
+            } catch(SignatureException e) {
+                String message = "Fail to sign request message";
                 logger.error(message);
-                httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                throw new IOException(message, e);
+            }
+
+            if (signature.compareTo(signedRequestMessage) != 0) {
+                String message = "Error: Invalid authentication token.";
+                logger.error(message);
+                wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                 return;
             }
+        } else {
+            String message = "Error: Authorization is required.";
+            logger.error(message);
+            wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+            return;
         }
     }
 
@@ -162,59 +168,52 @@ public abstract class HMACHttpServlet extends HttpServlet {
     /**
      * Helper method to append server response validation
      * 
-     * @param request
-     * @param response
+     * @param wrappedRequest
+     * @param wrappedResponse
      * @throws IOException
      */
-    private void appendServerResponseValidation(ServletRequest request, ServletResponse response)
-            throws IOException {
-        if (request instanceof HttpServletRequest && response instanceof HttpServletResponse) {
-            HttpServletRequest httpRequest = (HttpServletRequest) request;
-            HttpServletResponse httpResponse = (HttpServletResponse) response;
-            CharResponseWrapper wrappedResponse = new CharResponseWrapper(httpResponse);
-
-            String xAuthorizationTimestamp = httpRequest.getHeader(
-                HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
-            String authorization = httpRequest.getHeader(
-                HMACMessageCreator.PARAMETER_AUTHORIZATION);
-            if (authorization != null) {
-                HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
-                    authorization);
-                if (authHeader == null) {
-                    String message = "Error: Authorization is invalid.";
-                    logger.error(message);
-                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
-                    return;
-                }
-
-                String accessKey = authHeader.getId();
-                String nonce = authHeader.getNonce();
-
-                String secretKey = getSecretKey(accessKey);
-
-                //set response validation header
-                HMACMessageCreator messageCreator = new HMACMessageCreator();
-                String responseContent = wrappedResponse.toString();
-                String signableResponseMessage = messageCreator.createSignableResponseMessage(nonce,
-                    xAuthorizationTimestamp, responseContent);
-                String signedResponseMessage = "";
-                try {
-                    signedResponseMessage = this.algorithm.encryptMessage(secretKey,
-                        signableResponseMessage);
-                } catch(SignatureException e) {
-                    String message = "Fail to sign response message";
-                    logger.error(message);
-                    throw new IOException(message, e);
-                }
-                httpResponse.setHeader(
-                    HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256,
-                    signedResponseMessage);
-                httpResponse.getOutputStream().write(wrappedResponse.getByteArray()); //write back the response
-            } else {
-                String message = "Error: Authorization is required.";
+    private void appendServerResponseValidation(CharRequestWrapper wrappedRequest,
+            CharResponseWrapper wrappedResponse) throws IOException {
+        String xAuthorizationTimestamp = wrappedRequest.getHeader(
+            HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
+        String authorization = wrappedRequest.getHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION);
+        if (authorization != null) {
+            HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
+                authorization);
+            if (authHeader == null) {
+                String message = "Error: Authorization is invalid.";
                 logger.error(message);
-                httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                return;
             }
+
+            String accessKey = authHeader.getId();
+            String nonce = authHeader.getNonce();
+
+            String secretKey = getSecretKey(accessKey);
+
+            //set response validation header
+            HMACMessageCreator messageCreator = new HMACMessageCreator();
+            String responseContent = wrappedResponse.toString();
+            String signableResponseMessage = messageCreator.createSignableResponseMessage(nonce,
+                xAuthorizationTimestamp, responseContent);
+            String signedResponseMessage = "";
+            try {
+                signedResponseMessage = this.algorithm.encryptMessage(secretKey,
+                    signableResponseMessage);
+            } catch(SignatureException e) {
+                String message = "Fail to sign response message";
+                logger.error(message);
+                throw new IOException(message, e);
+            }
+            wrappedResponse.setHeader(
+                HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256,
+                signedResponseMessage);
+            wrappedResponse.getOutputStream().write(wrappedResponse.getByteArray()); //write back the response
+        } else {
+            String message = "Error: Authorization is required.";
+            logger.error(message);
+            wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
         }
     }
 
