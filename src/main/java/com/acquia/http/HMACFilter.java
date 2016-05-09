@@ -48,10 +48,11 @@ public abstract class HMACFilter implements Filter {
         if (request instanceof HttpServletRequest && response instanceof HttpServletResponse) {
             HttpServletRequest httpRequest = (HttpServletRequest) request;
             HttpServletResponse httpResponse = (HttpServletResponse) response;
+            CharRequestWrapper wrappedRequest = new CharRequestWrapper(httpRequest);
             CharResponseWrapper wrappedResponse = new CharResponseWrapper(httpResponse);
 
             //check timestamp
-            String xAuthorizationTimestamp = httpRequest.getHeader(
+            String xAuthorizationTimestamp = wrappedRequest.getHeader(
                 HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
             if (xAuthorizationTimestamp != null) {
                 int timestampStatus = this.compareTimestampWithinTolerance(
@@ -59,23 +60,23 @@ public abstract class HMACFilter implements Filter {
                 if (timestampStatus > 0) {
                     String message = "Error: X-Authorization-Timestamp is too far in the future.";
                     logger.error(message);
-                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                    wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                     return;
                 } else if (timestampStatus < 0) {
                     String message = "Error: X-Authorization-Timestamp is too far in the past.";
                     logger.error(message);
-                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                    wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                     return;
                 }
             } else {
                 String message = "Error: X-Authorization-Timestamp is required.";
                 logger.error(message);
-                httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                 return;
             }
 
             //check authorization
-            String authorization = httpRequest.getHeader(
+            String authorization = wrappedRequest.getHeader(
                 HMACMessageCreator.PARAMETER_AUTHORIZATION);
             if (authorization != null) {
                 HMACAuthorizationHeader authHeader = HMACAuthorizationHeader.getAuthorizationHeaderObject(
@@ -83,7 +84,7 @@ public abstract class HMACFilter implements Filter {
                 if (authHeader == null) {
                     String message = "Error: Invalid authHeader; one or more required attributes are not set.";
                     logger.error(message);
-                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                    wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                     return;
                 }
 
@@ -96,7 +97,7 @@ public abstract class HMACFilter implements Filter {
                 //check request validity
                 HMACMessageCreator messageCreator = new HMACMessageCreator();
                 String signableRequestMessage = messageCreator.createSignableRequestMessage(
-                    httpRequest);
+                    wrappedRequest);
                 logger.trace("signableRequestMessage:\n" + signableRequestMessage);
                 String signedRequestMessage = "";
                 try {
@@ -112,12 +113,15 @@ public abstract class HMACFilter implements Filter {
                 if (signature.compareTo(signedRequestMessage) != 0) {
                     String message = "Error: Invalid authentication token.";
                     logger.error(message);
-                    httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                    wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                     return;
                 }
 
+                //reset input stream so it is ready to be consumed again
+                wrappedRequest.resetInputStream();
+
                 //pass along to other filter
-                chain.doFilter(request, wrappedResponse);
+                chain.doFilter(wrappedRequest, wrappedResponse);
 
                 //set response validation header
                 String responseContent = wrappedResponse.toString();
@@ -134,14 +138,14 @@ public abstract class HMACFilter implements Filter {
                     logger.error(message);
                     throw new IOException(message, e);
                 }
-                httpResponse.setHeader(
+                wrappedResponse.setHeader(
                     HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256,
                     signedResponseMessage);
-                httpResponse.getOutputStream().write(wrappedResponse.getByteArray()); //write back the response
+                wrappedResponse.getOutputStream().write(wrappedResponse.getByteArray()); //write back the response
             } else {
                 String message = "Error: Authorization is required.";
                 logger.error(message);
-                httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                 return;
             }
         }
