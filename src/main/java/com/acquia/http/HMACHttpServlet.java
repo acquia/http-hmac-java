@@ -61,7 +61,7 @@ public abstract class HMACHttpServlet extends HttpServlet {
             super.service(wrappedRequest, wrappedResponse);
 
             //upon exit
-            this.appendServerResponseValidation(wrappedRequest, wrappedResponse);
+            this.appendServerResponseValidation(wrappedRequest, wrappedResponse, httpResponse);
         } else {
             super.service(request, response);
         }
@@ -170,10 +170,12 @@ public abstract class HMACHttpServlet extends HttpServlet {
      * 
      * @param wrappedRequest
      * @param wrappedResponse
+     * @param httpResponse
      * @throws IOException
      */
     private void appendServerResponseValidation(CharRequestWrapper wrappedRequest,
-            CharResponseWrapper wrappedResponse) throws IOException {
+            CharResponseWrapper wrappedResponse, HttpServletResponse httpResponse)
+            throws IOException {
         String xAuthorizationTimestamp = wrappedRequest.getHeader(
             HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP);
         String authorization = wrappedRequest.getHeader(HMACMessageCreator.PARAMETER_AUTHORIZATION);
@@ -209,7 +211,7 @@ public abstract class HMACHttpServlet extends HttpServlet {
             wrappedResponse.setHeader(
                 HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256,
                 signedResponseMessage);
-            wrappedResponse.getOutputStream().write(wrappedResponse.getByteArray()); //write back the response
+            httpResponse.getOutputStream().write(wrappedResponse.getByteArray()); //write back the response to the REAL HttpServletResponse
         } else {
             String message = "Error: Authorization is required.";
             logger.error(message);

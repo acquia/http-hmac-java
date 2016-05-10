@@ -141,7 +141,7 @@ public abstract class HMACFilter implements Filter {
                 wrappedResponse.setHeader(
                     HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256,
                     signedResponseMessage);
-                wrappedResponse.getOutputStream().write(wrappedResponse.getByteArray()); //write back the response
+                httpResponse.getOutputStream().write(wrappedResponse.getByteArray()); //write back the response to the REAL HttpServletResponse
             } else {
                 String message = "Error: Authorization is required.";
                 logger.error(message);
