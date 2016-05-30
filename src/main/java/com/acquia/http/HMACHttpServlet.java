@@ -118,8 +118,8 @@ public abstract class HMACHttpServlet extends HttpServlet {
             String secretKey = null;
             try {
                 secretKey = getSecretKey(accessKey);
-            } catch(Exception skE) {
-                String message = "Error: Fail to obtain the secret key from the server.";
+            } catch(SecretKeyException skE) {
+                String message = "Error: " + skE.getMessage();
                 logger.error(message + "\n" + skE.getStackTrace());
                 wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                 return;
@@ -203,8 +203,8 @@ public abstract class HMACHttpServlet extends HttpServlet {
             String secretKey = null;
             try {
                 secretKey = getSecretKey(accessKey);
-            } catch(Exception skE) {
-                String message = "Error: Fail to obtain the secret key from the server.";
+            } catch(SecretKeyException skE) {
+                String message = "Error: " + skE.getMessage();
                 logger.error(message + "\n" + skE.getStackTrace());
                 wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                 return;
@@ -240,8 +240,8 @@ public abstract class HMACHttpServlet extends HttpServlet {
      * 
      * @param accessKey
      * @return
-     * @throws Exception
+     * @throws SecretKeyException
      */
-    protected abstract String getSecretKey(String accessKey) throws Exception;
+    protected abstract String getSecretKey(String accessKey) throws SecretKeyException;
 
 }
