@@ -140,7 +140,7 @@ public class HMACFilterTest {
         //test the filter
         HMACFilter filter = new HMACFilter() {
             @Override
-            protected String getSecretKey(String accessKey) {
+            protected String getSecretKey(String accessKey) throws SecretKeyException {
                 if (id.equals(accessKey)) {
                     return secretKey;
                 }
@@ -166,7 +166,7 @@ public class HMACFilterTest {
         //test filter
         HMACFilter filter = new HMACFilter() {
             @Override
-            protected String getSecretKey(String accessKey) {
+            protected String getSecretKey(String accessKey) throws SecretKeyException {
                 if (id.equals(accessKey)) {
                     return "other-key";
                 }
@@ -179,6 +179,29 @@ public class HMACFilterTest {
         testFilter.doFilter(this.request, response, filterChain);
 
         verify(response).sendError(eq(HttpServletResponse.SC_UNAUTHORIZED), (String) anyObject());
+        verify(filterChain, never()).doFilter(this.request, response);
+    }
+
+    @Test
+    public void testSecretKeyNotFound() throws IOException, ServletException {
+        //mock stuffs
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        FilterChain filterChain = mock(FilterChain.class);
+
+        //test filter
+        HMACFilter filter = new HMACFilter() {
+            @Override
+            protected String getSecretKey(String accessKey) throws SecretKeyException {
+                throw new SecretKeyException(SecretKeyException.NOT_FOUND);
+            }
+        };
+        HMACFilter testFilter = spy(filter);
+        doReturn(0).when(testFilter).compareTimestampWithinTolerance(anyLong());
+        testFilter.init(this.filterConfig);
+        testFilter.doFilter(this.request, response, filterChain);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_UNAUTHORIZED),
+            eq("Error: " + SecretKeyException.NOT_FOUND));
         verify(filterChain, never()).doFilter(this.request, response);
     }
 
