@@ -92,7 +92,15 @@ public abstract class HMACFilter implements Filter {
                 String nonce = authHeader.getNonce();
                 String signature = authHeader.getSignature();
 
-                String secretKey = getSecretKey(accessKey);
+                String secretKey = null;
+                try {
+                    secretKey = getSecretKey(accessKey);
+                } catch(Exception skE) {
+                    String message = "Error: Fail to obtain the secret key from the server.";
+                    logger.error(message + "\n" + skE.getStackTrace());
+                    wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                    return;
+                }
 
                 //check request validity
                 HMACMessageCreator messageCreator = new HMACMessageCreator();
@@ -174,12 +182,13 @@ public abstract class HMACFilter implements Filter {
         }
     }
 
-    /** 
+    /**
      * Returns the secret key for the given access key.
      * 
-     * @param accessKey Access Key
-     * @return Secret Key
+     * @param accessKey
+     * @return
+     * @throws Exception
      */
-    protected abstract String getSecretKey(String accessKey);
+    protected abstract String getSecretKey(String accessKey) throws Exception;
 
 }
