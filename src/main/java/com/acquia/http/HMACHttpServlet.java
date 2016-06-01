@@ -52,16 +52,19 @@ public abstract class HMACHttpServlet extends HttpServlet {
             CharResponseWrapper wrappedResponse = new CharResponseWrapper(httpResponse);
 
             //upon entry
-            this.validateRequestAuthorization(wrappedRequest, wrappedResponse);
+            boolean isAuthorized = this.validateRequestAuthorization(wrappedRequest,
+                wrappedResponse);
 
-            //reset input stream so it is ready to be consumed again
-            wrappedRequest.resetInputStream();
+            if (isAuthorized) {
+                //reset input stream so it is ready to be consumed again
+                wrappedRequest.resetInputStream();
 
-            //do service
-            super.service(wrappedRequest, wrappedResponse);
+                //do service
+                this.doHmacService(wrappedRequest, wrappedResponse);
 
-            //upon exit
-            this.appendServerResponseValidation(wrappedRequest, wrappedResponse, httpResponse);
+                //upon exit
+                this.appendServerResponseValidation(wrappedRequest, wrappedResponse, httpResponse);
+            }
         } else {
             super.service(request, response);
         }
@@ -69,12 +72,12 @@ public abstract class HMACHttpServlet extends HttpServlet {
 
     /**
      * Helper method to validate request authorization
-     * 
      * @param wrappedRequest
      * @param wrappedResponse
+     * @return true if signature is correct; false otherwise
      * @throws IOException
      */
-    private void validateRequestAuthorization(CharRequestWrapper wrappedRequest,
+    private boolean validateRequestAuthorization(CharRequestWrapper wrappedRequest,
             CharResponseWrapper wrappedResponse) throws IOException {
         //check timestamp
         String xAuthorizationTimestamp = wrappedRequest.getHeader(
@@ -86,18 +89,18 @@ public abstract class HMACHttpServlet extends HttpServlet {
                 String message = "Error: X-Authorization-Timestamp is too far in the future.";
                 logger.error(message);
                 wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
-                return;
+                return false;
             } else if (timestampStatus < 0) {
                 String message = "Error: X-Authorization-Timestamp is too far in the past.";
                 logger.error(message);
                 wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
-                return;
+                return false;
             }
         } else {
             String message = "Error: X-Authorization-Timestamp is required.";
             logger.error(message);
             wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
-            return;
+            return false;
         }
 
         //check authorization
@@ -109,13 +112,21 @@ public abstract class HMACHttpServlet extends HttpServlet {
                 String message = "Error: Invalid authHeader; one or more required attributes are not set.";
                 logger.error(message);
                 wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
-                return;
+                return false;
             }
 
             String accessKey = authHeader.getId();
             String signature = authHeader.getSignature();
 
-            String secretKey = getSecretKey(accessKey);
+            String secretKey = null;
+            try {
+                secretKey = getSecretKey(accessKey);
+            } catch(SecretKeyException skE) {
+                String message = "Error: " + skE.getMessage();
+                logger.error(message + "\n" + skE.getStackTrace());
+                wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                return false;
+            }
 
             //check request validity
             HMACMessageCreator messageCreator = new HMACMessageCreator();
@@ -137,14 +148,16 @@ public abstract class HMACHttpServlet extends HttpServlet {
                 String message = "Error: Invalid authentication token.";
                 logger.error(message);
                 wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
-                return;
+                return false;
             }
         } else {
             String message = "Error: Authorization is required.";
             logger.error(message);
             wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
-            return;
+            return false;
         }
+
+        return true;
     }
 
     /**
@@ -163,6 +176,19 @@ public abstract class HMACHttpServlet extends HttpServlet {
         } else {
             return 0;
         }
+    }
+
+    /**
+     * Call HttpServlet service method
+     * 
+     * @param wrappedRequest
+     * @param wrappedResponse
+     * @throws ServletException
+     * @throws IOException
+     */
+    protected void doHmacService(CharRequestWrapper wrappedRequest,
+            CharResponseWrapper wrappedResponse) throws ServletException, IOException {
+        super.service(wrappedRequest, wrappedResponse);
     }
 
     /**
@@ -192,7 +218,15 @@ public abstract class HMACHttpServlet extends HttpServlet {
             String accessKey = authHeader.getId();
             String nonce = authHeader.getNonce();
 
-            String secretKey = getSecretKey(accessKey);
+            String secretKey = null;
+            try {
+                secretKey = getSecretKey(accessKey);
+            } catch(SecretKeyException skE) {
+                String message = "Error: " + skE.getMessage();
+                logger.error(message + "\n" + skE.getStackTrace());
+                wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
+                return;
+            }
 
             //set response validation header
             HMACMessageCreator messageCreator = new HMACMessageCreator();
@@ -219,12 +253,13 @@ public abstract class HMACHttpServlet extends HttpServlet {
         }
     }
 
-    /** 
+    /**
      * Returns the secret key for the given access key.
      * 
-     * @param accessKey Access Key
-     * @return Secret Key
+     * @param accessKey
+     * @return
+     * @throws SecretKeyException
      */
-    protected abstract String getSecretKey(String accessKey);
+    protected abstract String getSecretKey(String accessKey) throws SecretKeyException;
 
 }

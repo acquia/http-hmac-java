@@ -69,7 +69,14 @@ public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
                 StringBuffer statusBuffer = new StringBuffer("Error: Server failed to provide "
                         + HMACMessageCreator.PARAMETER_X_SERVER_AUTHORIZATION_HMAC_SHA256
                         + ", response validation header.");
-                statusBuffer.append("\nStatus Line: " + response.getStatusLine().toString());
+                statusBuffer.append("\n---- Interceptor Signable Request Message:\n").append(
+                    (String) context.getAttribute(
+                        HMACHttpRequestInterceptor.CONTEXT_SIGNABLE_REQUEST_MESSAGE));
+                statusBuffer.append("\n---- Interceptor Signed Request Message:\n").append(
+                    (String) context.getAttribute(
+                        HMACHttpRequestInterceptor.CONTEXT_SIGNED_REQUEST_MESSAGE));
+                statusBuffer.append("\n---- Server Response Status Line:\n").append(
+                    response.getStatusLine().toString());
 
                 String message = statusBuffer.toString();
                 logger.error(message);

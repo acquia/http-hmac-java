@@ -36,6 +36,9 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
     public static final String CONTEXT_AUTH_HEADER = "authHeader";
     public static final String CONTEXT_X_AUTHORIZATION_TIMESTAMP = "xAuthorizationTimestamp";
 
+    public static final String CONTEXT_SIGNABLE_REQUEST_MESSAGE = "signableRequestMessage";
+    public static final String CONTEXT_SIGNED_REQUEST_MESSAGE = "signedRequestMessage";
+
     public static final String VERSION = "2.0";
 
     /**
@@ -222,6 +225,9 @@ public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
         context.setAttribute(CONTEXT_AUTH_HEADER, authHeader);
         context.setAttribute(CONTEXT_X_AUTHORIZATION_TIMESTAMP, request.getFirstHeader(
             HMACMessageCreator.PARAMETER_X_AUTHORIZATION_TIMESTAMP).getValue()); //this header is guaranteed to exist
+
+        context.setAttribute(CONTEXT_SIGNABLE_REQUEST_MESSAGE, signableRequestMessage);
+        context.setAttribute(CONTEXT_SIGNED_REQUEST_MESSAGE, signedRequestMessage);
     }
 
     /**
