@@ -97,7 +97,7 @@ public abstract class HMACFilter implements Filter {
                     secretKey = getSecretKey(accessKey);
                 } catch(SecretKeyException skE) {
                     String message = "Error: " + skE.getMessage();
-                    logger.error(message + "\n" + skE.getStackTrace());
+                    logger.error(message, skE);
                     wrappedResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, message);
                     return;
                 }
@@ -114,7 +114,7 @@ public abstract class HMACFilter implements Filter {
                     logger.trace("signedRequestMessage:\n" + signedRequestMessage);
                 } catch(SignatureException e) {
                     String message = "Fail to sign request message";
-                    logger.error(message);
+                    logger.error(message, e);
                     throw new IOException(message, e);
                 }
 
@@ -143,7 +143,7 @@ public abstract class HMACFilter implements Filter {
                     logger.trace("signedResponseMessage:\n" + signedResponseMessage);
                 } catch(SignatureException e) {
                     String message = "Fail to sign response message";
-                    logger.error(message);
+                    logger.error(message, e);
                     throw new IOException(message, e);
                 }
                 wrappedResponse.setHeader(
