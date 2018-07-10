@@ -21,7 +21,7 @@ method.
 Example: Add the authorization header for the realm = Acquia, access key = 1, secret key = secret-key 
 and customer headers = 'Custom1;Custom2' using the algorithm = 'SHA256'
 
-```
+```java
 HMACHttpRequestInterceptor authorizationInterceptor = new HMACHttpRequestInterceptor("Acquia", "1", "secret-key", "SHA256");
 authorizationInterceptor.setCustomHeaders(new String[] { "Custom1", "Custom2" } );
 
