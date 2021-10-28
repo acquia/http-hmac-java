@@ -65,6 +65,12 @@ public class HMACMessageCreator {
 
         String host = request.getHeader(PARAMETER_HOST);
         String path = request.getRequestURI();
+        String forwardedHost= request.getHeader("x-forwarded-host");
+        String replacedPath=request.getHeader("x-replaced-path");
+        if(forwardedHost!=null && replacedPath!=null) {
+             host =forwardedHost;
+             path = replacedPath;
+        }
         String queryParameters = request.getQueryString();
         logger.trace("Query string received: " + queryParameters);
         if (queryParameters == null) {
