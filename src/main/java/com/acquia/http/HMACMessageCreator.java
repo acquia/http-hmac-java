@@ -68,7 +68,7 @@ public class HMACMessageCreator {
         String forwardedHost = request.getHeader("x-forwarded-host");
         String replacedPath = request.getHeader("x-replaced-path");
         if(forwardedHost != null && replacedPath != null) {
-             host = forwardedHost;
+             host = getFirstHost(forwardedHost);
              path = replacedPath;
         }
         String queryParameters = request.getQueryString();
@@ -100,6 +100,13 @@ public class HMACMessageCreator {
             authorizationCustomHeaderParameterMap, xAuthorizationTimestamp, contentLength,
             contentType, xAuthorizationContentSha256, requestBody);
     }
+
+    String getFirstHost(String host){
+        String[] hostArray = host.split("\\s*,\\s*");
+        return hostArray[0];
+    }
+
+
 
     /**
      * Create a key-value pair Map with custom headers of the Authorization
