@@ -2,7 +2,6 @@ package com.acquia.http;
 
 import java.io.IOException;
 import java.security.SignatureException;
-
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -11,8 +10,8 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * Abstract Filter that can validate HTTP requests by the HMAC Authorization header.
@@ -23,7 +22,7 @@ import org.apache.log4j.Logger;
  */
 public abstract class HMACFilter implements Filter {
 
-    private static Logger logger = Logger.getLogger(HMACFilter.class);
+    private static Logger logger = LogManager.getLogger(HMACFilter.class);
 
     /**
      * The config parameter that defines the name of the algorithm used to create the HMAC.
