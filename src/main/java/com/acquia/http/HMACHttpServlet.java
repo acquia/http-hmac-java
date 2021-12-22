@@ -2,7 +2,6 @@ package com.acquia.http;
 
 import java.io.IOException;
 import java.security.SignatureException;
-
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
@@ -10,8 +9,8 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * An abstract class that will validate the Authorization header based on the HMAC.
@@ -22,7 +21,7 @@ import org.apache.log4j.Logger;
 @SuppressWarnings("serial")
 public abstract class HMACHttpServlet extends HttpServlet {
 
-    private static Logger logger = Logger.getLogger(HMACHttpServlet.class);
+    private static Logger logger = LogManager.getLogger(HMACHttpServlet.class);
 
     /**
      * The config parameter that defines the name of the algorithm used the encrypt the message.

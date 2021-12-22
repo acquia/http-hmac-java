@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.http.Header;
@@ -20,7 +19,8 @@ import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpRequestInterceptor;
 import org.apache.http.protocol.HttpContext;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * An HttpRequestInterceptor that adds the Authorization header that contains the HMAC.
@@ -30,7 +30,7 @@ import org.apache.log4j.Logger;
  */
 public class HMACHttpRequestInterceptor implements HttpRequestInterceptor {
 
-    private static Logger logger = Logger.getLogger(HMACHttpRequestInterceptor.class);
+    private static Logger logger = LogManager.getLogger(HMACHttpRequestInterceptor.class);
 
     public static final String CONTEXT_HTTP_VERB = "httpVerb";
     public static final String CONTEXT_AUTH_HEADER = "authHeader";

@@ -12,9 +12,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import javax.servlet.http.HttpServletRequest;
-
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.http.Header;
@@ -22,7 +20,8 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * The HMACMessageCreator is a utility class to create messages that will be encrypted into HMACs.
@@ -32,7 +31,7 @@ import org.apache.log4j.Logger;
  */
 public class HMACMessageCreator {
 
-    private static Logger logger = Logger.getLogger(HMACMessageCreator.class);
+    private static Logger logger = LogManager.getLogger(HMACMessageCreator.class);
 
     public static final String ENCODING_UTF_8 = "UTF-8";
 

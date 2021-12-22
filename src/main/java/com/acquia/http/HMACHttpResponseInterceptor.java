@@ -6,14 +6,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.SignatureException;
-
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpException;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpResponseInterceptor;
 import org.apache.http.protocol.HttpContext;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * An HttpResponseInterceptor that adds X-Server-Authorization-HMAC-SHA256 response header that contains the encrypted response
@@ -23,7 +23,7 @@ import org.apache.log4j.Logger;
  */
 public class HMACHttpResponseInterceptor implements HttpResponseInterceptor {
 
-    private static Logger logger = Logger.getLogger(HttpResponseInterceptor.class);
+    private static Logger logger = LogManager.getLogger(HttpResponseInterceptor.class);
 
     /**
      * The secret key
